@@ -1,0 +1,117 @@
+# Releases Pastezo from main, built for macOS, Windows and Linux on GitHub's machines.
+#   push to main with a new version (after `make release`: Cargo.toml has a version
+#       with no tag v<version> yet) → all builds → tag v<version> + a published release
+#       with the files (notes: the version's section of CHANGELOG.md)
+#   push without a new version → nothing to build
+#   "Run workflow" button → the same; with no new version, the builds of the current
+#       main, downloadable from the run page (no release)
+# Each build job puts its files in dist/ (see the Makefile); the last job adds SHA256SUMS.
+# The tag is made only once every build passed: a failed release is retried by pushing again.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# one release at a time
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already released: nothing to release."
+          else
+            echo "New version: v$version."
+            echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: version
+    if: needs.version.outputs.tag != '' || github.event_name == 'workflow_dispatch'
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS arm64 + x64, os: macos-14, kind: mac }
+          - { name: Windows x64, os: windows-latest, kind: windows, arch: x64 }
+          # cross-compiled on x64 with the MSVC ARM64 tools
+          - { name: Windows arm64, os: windows-latest, kind: windows, arch: arm64 }
+          # 22.04: an older glibc, so the build runs on more distributions
+          - { name: Linux x64, os: ubuntu-22.04, kind: linux }
+          - { name: Linux arm64, os: ubuntu-22.04-arm, kind: linux }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Linux libraries
+        if: matrix.kind == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libfontconfig1-dev libxkbcommon-dev libwayland-dev
+
+      - name: Build (macOS)
+        if: matrix.kind == 'mac'
+        run: make mac
+
+      - name: Build (Linux)
+        if: matrix.kind == 'linux'
+        run: make linux
+
+      - name: Build (Windows)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          apps/pastezo/scripts/bundle-windows.ps1 -Arch ${{ matrix.arch }}
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          $triple = if ("${{ matrix.arch }}" -eq "arm64") { "aarch64-pc-windows-msvc" } else { "x86_64-pc-windows-msvc" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "target/$triple/release/bundle/Pastezo_${version}_windows_${{ matrix.arch }}.zip" "dist/Pastezo-$version-windows-${{ matrix.arch }}.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.os }}-${{ matrix.kind }}-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum Pastezo-* > SHA256SUMS && cat SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Pastezo-all
+          path: dist/*
+      - name: Publish the release
+        if: needs.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+        # notes: this version's section of CHANGELOG.md (written by knope)
+        run: |
+          awk -v v="${TAG#v}" 'index($0, "## " v " ") == 1 { on = 1; next } /^## / { on = 0 } on' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then notes="--notes-file notes.md"; else notes="--generate-notes"; fi
+          # creates the tag on the built commit too
+          gh release create "$TAG" dist/* --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "Pastezo $TAG" --latest $notes

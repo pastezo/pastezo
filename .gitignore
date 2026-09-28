@@ -1,0 +1,22 @@
+# Rust
+target/
+
+*.log
+
+# Local tooling
+.playwright-mcp/
+.env
+.env.*
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# release builds (make release)
+dist/
+
+# agent instructions (local only)
+AGENTS.md
+.claude/

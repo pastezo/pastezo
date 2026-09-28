@@ -1,0 +1,55 @@
+[package]
+name = "pastezo"
+version.workspace = true
+edition.workspace = true
+description = "Pastezo window: shows the clipboard history recorded by pastezo-agent"
+
+[[bin]]
+name = "Pastezo"
+path = "src/main.rs"
+
+[dependencies]
+# history export: images inside the JSON file
+base64 = "0.23"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clip-core = { path = "../../crates/clip-core" }
+i-slint-backend-winit = "=1.18.1" # patched: Settings item in the macOS app menu
+icu_calendar = "2"
+icu_datetime = "2"
+icu_decimal = "2"
+# system font families for Settings → Typography (the version Slint already uses)
+fontique = "0.11"
+icu_locale = "2"
+icu_plurals = "2"
+open = "5"
+# system open/save dialogs (history import/export); Linux: the XDG portal
+rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sys-locale = "0.3"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "unstable-winit-030", "raw-window-handle-06"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSDragging", "NSDraggingItem", "NSDraggingSession", "NSEvent", "NSImage", "NSPasteboard", "NSResponder", "NSView", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSString", "NSLocale", "NSDateFormatter", "NSFormatter", "NSURL"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# dragging an image out of the window: XDND on the window's own X connection
+x11rb = { version = "0.13", features = ["allow-unsafe-code", "dl-libxcb"] }
+x11-dl = "2.21"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_Globalization", "Win32_System_Registry"] }
+# dragging an image out of the window (shell data object + SHDoDragDrop)
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse"] }
+
+[dev-dependencies]
+i-slint-backend-testing = "=1.18.1"
+tempfile = "3"
+
+[build-dependencies]
+slint-build = "1.18"
+# Windows: the .exe icon (pastezo.rc); does nothing on other targets
+embed-resource = "3"

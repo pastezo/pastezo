@@ -1,0 +1,2325 @@
+// Pastezo window. Sizes, colours and fonts match the design 1:1
+// (see the "Design" globals below; every value comes from the reference CSS).
+
+// Standard controls for Windows and Linux (fluent style, build.rs); macOS uses the
+// AppKit-accurate ones below (Slint's cupertino set is too rough a copy).
+import { ListView, Palette, Button as StdButton, CheckBox as StdCheckBox, Slider as StdSlider } from "std-widgets.slint";
+// for Rust: the standard controls' light/dark follows the chosen theme
+export { Palette }
+import "../fonts/MiSans-Regular.ttf";
+import "../fonts/MiSans-Medium.ttf";
+// clips that look like code (no ligatures: "=>" stays as copied)
+import "../fonts/JetBrainsMonoNL-Regular.ttf";
+
+/// A piece of a formatted message; `bold` marks what the translation wraps in <b>…</b>.
+export struct Part {
+    text: string,
+    bold: bool,
+    /// spaces around the run, on screen (left/right), in space widths
+    left-gap: int,
+    right-gap: int,
+}
+
+/// Kinds of in-app notifications (see src/toasts.rs).
+export enum ToastKind { success, error, info, warning }
+
+export struct Toast {
+    kind: ToastKind,
+    text: string,
+    /// a button after the text ("Undo"); empty: none
+    action: string,
+}
+
+export struct ClipItem {
+    id: int,
+    /// "text" or "image"
+    is-image: bool,
+    preview: string,
+    is-link: bool,
+    /// looks like code: monospaced (ClipText.code-*)
+    is-code: bool,
+    /// the clip's own text direction (first strong character), like dir="auto"
+    text-rtl: bool,
+    /// deleted: the row fades out and collapses, then Rust drops it from the model
+    removing: bool,
+    link: string,
+    /// preview file; loaded by Thumbs.load only while the row is on screen
+    thumb-path: string,
+    thumb-width: length,
+    thumb-height: length,
+    source: [Part],
+    time: [Part],
+    /// kept at the top of the list; a red pin before the time
+    pinned: bool,
+}
+
+/// Finished features kept out of sight for now (the code stays; Rust or the
+/// tests may switch them on).
+export global Features {
+    /// pinning clips to the top of the list: the pin button and the red pin
+    in property <bool> pins: false;
+}
+
+/// Every colour of one theme (src/themes.rs fills them in).
+export struct ThemeColors {
+    background: color,
+    /// card outline in the settings
+    border: color,
+    text: color,
+    link: color,
+    row-hover: color,
+    meta: color,
+    meta-strong: color,
+    icon: color,
+    icon-hover: color,
+    search-icon: color,
+    /// the search field, a shade lighter than the window so it stands out
+    field-background: color,
+    field-border: color,
+    field-border-focus: color,
+    placeholder: color,
+    dark: bool,
+}
+
+/// The theme in effect (src/settings.rs keeps the choice).
+export global Theme {
+    in property <ThemeColors> chosen: {
+        background: #ffffff, border: #dfdfdf, text: #111111, link: #111111,
+        row-hover: #f8f8f8, meta: #c4c4c4, meta-strong: #a3a3a3, icon: #b8b8b8, icon-hover: #6b6b6b,
+        search-icon: #b0b0b0, field-background: #ffffff, field-border: #e3e3e3, field-border-focus: #c8c8c8, placeholder: #a9a9a9,
+        dark: false,
+    };
+    /// "system" (kept from older settings): the design's light or dark one, as the OS
+    in property <bool> follow-system;
+    in property <ThemeColors> system-light;
+    in property <ThemeColors> system-dark;
+    out property <ThemeColors> colors: !follow-system ? chosen
+        : Palette.color-scheme == ColorScheme.dark ? system-dark : system-light;
+    out property <bool> dark: colors.dark;
+}
+
+export global Design {
+    // MiSans weight classes: Regular = 330, Medium = 380
+    out property <int> regular: 330;
+    out property <int> medium: 380;
+    // CSS line-height 1.45 / 1.6 expressed against MiSans' natural line height (1.326 em)
+    out property <float> text-line: 1.0935;
+    out property <float> meta-line: 1.2066;
+
+    // the theme's colours (the design's light one is the reference)
+    property <bool> dark: Theme.dark;
+    property <ThemeColors> c: Theme.colors;
+    out property <color> background: c.background;
+    out property <color> row-hover: c.row-hover;
+    out property <color> text: c.text;
+    out property <color> link: c.link;
+    out property <color> meta: c.meta;
+    out property <color> meta-strong: c.meta-strong;
+    out property <color> icon: c.icon;
+    out property <color> icon-hover: c.icon-hover;
+    out property <color> search-icon: c.search-icon;
+    out property <color> field-background: c.field-background;
+    out property <color> field-border: c.field-border;
+    out property <color> field-border-focus: c.field-border-focus;
+    out property <color> placeholder: c.placeholder;
+    out property <color> scroll-indicator: dark ? #ffffff66 : #00000080;
+
+    // notifications
+    out property <color> toast-success: #34c759;
+    out property <color> toast-error: #ff3b30;
+    out property <color> toast-info: #0a84ff;
+    out property <color> toast-warning: #ff9f0a;
+    out property <color> toast-background: dark ? #2c2c2e : #ffffff;
+    out property <color> toast-border: dark ? #ffffff10 : #0000000b;
+    out property <color> toast-shadow: dark ? #00000018 : #00000008;
+
+    // settings
+    /// the one accent colour of every selection, control and link-like highlight
+    out property <color> accent: dark ? #0a84ff : #147aff;
+    // light: warm, sampled from the Bear settings the design follows
+    out property <color> settings-header: dark ? #1e1e1e : #faf2ed;
+    out property <color> settings-background: dark ? #262626 : #f4edea;
+    out property <color> settings-title: dark ? #d6d6d6 : #4a4847;
+    out property <color> header-separator: dark ? #000000 : #d7d0cd;
+    out property <color> separator: dark ? #ffffff14 : #00000014;
+    out property <color> tab-selected: dark ? #ffffff14 : #ebe3de;
+    out property <color> tab-idle: dark ? #a1a1a6 : #716d6b;
+    /// ring and sun/moon of the chosen theme card: red, as in Bear (not the accent)
+    out property <color> theme-chosen: #cd5654;
+    // Settings → Statistics: a colour per kind (the system blue, green, orange)
+    out property <color> stats-text: self.accent;
+    out property <color> stats-link: dark ? #30d158 : #34c759;
+    out property <color> stats-image: dark ? #ff9f0a : #ff9500;
+    out property <color> stats-card: dark ? #2f2f2f : #ffffff;
+    /// a day with no copies
+    out property <color> stats-empty: dark ? #ffffff1f : #0000001a;
+    /// a pinned clip's pin
+    out property <color> pin: dark ? #ff6b6b : #e5484d;
+    out property <color> control: dark ? #3a3a3c : #ffffff;
+    out property <color> control-border: dark ? #ffffff1a : #00000026;
+    out property <color> slider-track: dark ? #ffffff26 : #0000001a;
+    out property <color> slider-tick: dark ? #ffffff40 : #00000033;
+    // selected text in a row (macOS selection colours)
+    out property <color> selection: dark ? #3f638b : #b3d7ff;
+    out property <color> danger: dark ? #ff453a : #ff3b30;
+}
+
+/// Settings → Typography: the clips' text in the list (src/settings.rs TextStyle).
+export global ClipText {
+    in property <string> font: "MiSans";
+    in property <length> size: 17px;
+    /// line height, em
+    in property <float> line: 1.45;
+    /// space above and below each clip
+    in property <length> gap: 26px;
+    // relative to the font's natural line height (the design's 1.45 em is Design.text-line)
+    out property <float> line-factor: Design.text-line * self.line / 1.45;
+    out property <length> line-height: self.size * self.line;
+    // Clips that look like code: JetBrains Mono, a size smaller (its letters
+    // are wider), on the same line pitch (its natural line height is 1.32 em).
+    out property <string> code-font: "JetBrains Mono NL";
+    out property <length> code-size: round(self.size * 0.88 / 1px) * 1px;
+    out property <int> code-weight: 400;
+    out property <float> code-line-factor: self.line-height / (self.code-size * 1.32);
+}
+
+/// Image previews, decoded on demand at display size (Rust keeps a small cache).
+export global Thumbs {
+    pure callback load(path: string) -> image;
+}
+
+/// Strings and layout facts supplied by Rust (translations, OS).
+export global Env {
+    in property <bool> rtl;
+    in property <bool> macos;
+    /// phones and narrow windows
+    in property <bool> touch;
+    in property <string> copy-label;
+    in property <string> delete-label;
+    in property <string> pin-label;
+    in property <string> unpin-label;
+    in property <string> search-placeholder;
+    in property <string> empty-text;
+    in property <string> no-results-text;
+    in property <string> settings-label;
+    // settings window
+    in property <string> settings-title;
+    in property <string> tab-general;
+    in property <string> tab-themes;
+    in property <string> tab-app-icon;
+    in property <string> tab-typography;
+    in property <string> text-font-label;
+    in property <string> font-size-label;
+    in property <string> line-height-label;
+    in property <string> clip-spacing-label;
+    in property <string> defaults;
+    /// slider values as the user's language writes them: "17 пт", "1,45 em"
+    pure callback format-points(float) -> string;
+    pure callback format-em(float) -> string;
+    in property <string> theme-light;
+    in property <string> theme-dark;
+    /// a clip in the theme cards: its text, "Copied from Safari", the time
+    in property <string> theme-sample;
+    in property <[Part]> sample-source;
+    in property <[Part]> sample-time;
+    in property <string> launch-label;
+    in property <string> launch-at-login;
+    in property <string> history-label;
+    in property <string> clear-all;
+    in property <string> clear-confirm;
+    in property <string> clear-warning;
+    in property <string> cancel;
+    // Settings → Statistics
+    in property <string> tab-statistics;
+    in property <string> stats-today-label;
+    in property <string> stats-week-label;
+    in property <string> stats-month-label;
+    in property <string> stats-by-day;
+    in property <string> stats-text-label;
+    in property <string> stats-link-label;
+    in property <string> stats-image-label;
+    // Settings → Import & Export
+    in property <string> tab-import-export;
+    in property <string> export-label;
+    in property <string> export-button;
+    in property <string> export-hint;
+    in property <string> import-label;
+    in property <string> import-button;
+    in property <string> import-hint;
+}
+
+component IconButton inherits Rectangle {
+    in property <image> icon;
+    /// read by screen readers (and found by the UI tests)
+    in property <string> label;
+    in property <length> size: 28px;
+    in property <bool> visible-now: true;
+    /// drawn in this colour instead of the grey ones (a pinned clip's pin)
+    in property <color> tint: transparent;
+    callback clicked();
+    out property <bool> hovered: ta.has-hover;
+    width: size;
+    height: size;
+    opacity: visible-now ? 1 : 0;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    Image {
+        source: icon;
+        width: parent.width;
+        height: parent.height;
+        colorize: root.tint.alpha > 0 ? root.tint : ta.has-hover ? Design.icon-hover : Design.icon;
+    }
+    ta := TouchArea {
+        enabled: visible-now;
+        mouse-cursor: MouseCursor.pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+/// "Copied from <b>Safari</b>": consecutive text runs, bold ones darker.
+component Runs inherits HorizontalLayout {
+    in property <[Part]> parts;
+    in property <color> color: Design.meta;
+    in property <color> strong: Design.meta-strong;
+    alignment: Env.rtl ? end : start;
+    spacing: 0;
+    for p in parts: HorizontalLayout {
+        // MiSans space = 0.29 em
+        padding-left: p.left-gap * 12px * 0.29;
+        padding-right: p.right-gap * 12px * 0.29;
+        Text {
+            text: p.text;
+            font-size: 12px;
+            line-height-factor: Design.meta-line;
+            // Slint rounds line boxes up to whole pixels; CSS keeps 12px × 1.6 = 19.2px
+            height: 12px * 1.6;
+            vertical-alignment: center;
+            font-weight: p.bold ? Design.medium : Design.regular;
+            color: p.bold ? root.strong : root.color;
+        }
+    }
+}
+
+/// Notification pill: a coloured circle with a glyph on the left, the text on
+/// the right. Error is inverted: red pill, white circle and text.
+component ToastView inherits Rectangle {
+    in property <Toast> toast;
+    /// the pill never gets wider than this (long translations are elided)
+    in property <length> limit;
+    /// the button after the text (`toast.action`) was pressed
+    callback action-clicked();
+
+    property <bool> error: toast.kind == ToastKind.error;
+    property <color> accent: toast.kind == ToastKind.success ? Design.toast-success
+        : toast.kind == ToastKind.info ? Design.toast-info
+        : toast.kind == ToastKind.warning ? Design.toast-warning
+        : Design.toast-error;
+
+    height: 36px;
+    width: min(root.limit, layout.preferred-width);
+    accessible-role: text;
+    accessible-label: toast.text;
+
+    // The software renderer ignores drop-shadow-*: a barely visible shadow — one
+    // translucent layer 1 px lower, drawn before (= below) the pill.
+    Rectangle {
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        border-radius: self.height / 2;
+        background: Design.toast-shadow;
+    }
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-radius: self.height / 2;
+        background: error ? Design.toast-error : Design.toast-background;
+        border-width: error ? 0 : 1px;
+        border-color: Design.toast-border;
+
+        layout := HorizontalLayout {
+            padding-left: 9px;
+            padding-right: 16px;
+            spacing: 8px;
+            alignment: start;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 10px;
+                    background: error ? #ffffff : accent;
+                    Image {
+                        width: 20px;
+                        height: 20px;
+                        source: toast.kind == ToastKind.success ? @image-url("icons/toast-check.svg")
+                            : toast.kind == ToastKind.info ? @image-url("icons/toast-info.svg")
+                            : @image-url("icons/toast-exclaim.svg");
+                        colorize: error ? Design.toast-error : #ffffff;
+                    }
+                }
+            }
+            Text {
+                text: toast.text;
+                font-size: 13px;
+                font-weight: Design.medium;
+                color: error ? #ffffff : Design.text;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            if toast.action != "": Text {
+                text: toast.action;
+                font-size: 13px;
+                font-weight: Design.medium;
+                color: error ? #ffffff : Design.accent;
+                vertical-alignment: center;
+                accessible-role: button;
+                accessible-label: toast.action;
+                accessible-action-default => { root.action-clicked(); }
+                TouchArea {
+                    mouse-cursor: MouseCursor.pointer;
+                    clicked => { root.action-clicked(); }
+                }
+            }
+        }
+    }
+}
+
+/// One history entry. The whole row is a TouchArea: a parent TouchArea keeps
+/// `has-hover` while the pointer is over its children (the buttons).
+component ClipRow inherits TouchArea {
+    in property <ClipItem> item;
+    in property <bool> copied;
+    /// chosen with the arrow keys: highlighted like under the mouse
+    in property <bool> selected;
+    /// bumped when the keyboard moves the selection: the selected row then
+    /// asks to be scrolled into view (its own position is only known here)
+    in property <int> reveal;
+    callback reveal-me(length, length);
+    changed reveal => {
+        if root.selected { root.reveal-me(self.y, self.height); }
+    }
+    /// the clip under the mouse (-1: none); the arrow keys start from it. Also
+    /// changes when the list recycles the hovered row for another clip (scrolling
+    /// under a resting pointer); rows not under the mouse stay at -1: no work.
+    property <int> hover-item: root.has-hover && !item.removing ? item.id : -1;
+    property <int> hover-reported: -1;
+    callback hover-changed(int, int);
+    changed hover-item => {
+        root.hover-changed(self.hover-reported, self.hover-item);
+        self.hover-reported = self.hover-item;
+    }
+    callback copy();
+    /// the row's text gives up the focus: back to the window's keys
+    callback release-focus();
+    /// ⌘C / Ctrl+C on selected text: its byte range in `item.preview`
+    callback copy-selection(int, int);
+    callback delete();
+    callback toggle-pin();
+    callback open-link();
+    /// the user started dragging the image preview out of the window
+    callback drag-image();
+
+    /// the row's text is focused or holds a selection (keeps its TextInput alive)
+    property <bool> text-active;
+    property <bool> show-actions: (root.has-hover || root.selected || Env.touch) && !item.removing;
+    property <length> start-pad: Env.touch ? 20px : 84px;
+    property <length> end-pad: Env.touch ? 16px : 32px;
+
+    // a click anywhere on the row (not its buttons, not a link) copies it
+    mouse-cursor: MouseCursor.pointer;
+    clicked => { root.copy(); }
+
+    // delete: fade out, then collapse so the rows below move up smoothly
+    height: item.removing ? 0 : content.preferred-height;
+    opacity: item.removing ? 0 : 1;
+    animate height { duration: 200ms; delay: 60ms; easing: ease-in-out; }
+    animate opacity { duration: 160ms; easing: ease-out; }
+
+    // clips the content while the row collapses
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        clip: true;
+
+        Rectangle {
+            width: parent.width;
+            height: parent.height;
+            background: (root.has-hover || root.selected) && !item.removing ? Design.row-hover : transparent;
+        }
+
+        content := HorizontalLayout {
+            y: 0;
+            height: self.preferred-height;
+            padding-top: Env.touch ? 18px : ClipText.gap;
+            padding-bottom: Env.touch ? 18px : ClipText.gap;
+            padding-left: Env.rtl ? root.end-pad : root.start-pad;
+            padding-right: Env.rtl ? root.start-pad : root.end-pad;
+            spacing: Env.touch ? 12px : 24px;
+
+            // right-to-left UI: the buttons move to the left
+            if Env.rtl: HorizontalLayout {
+                alignment: center;
+                spacing: 14px;
+                VerticalLayout { alignment: center; IconButton { label: Env.delete-label; icon: @image-url("icons/delete.svg"); visible-now: root.show-actions; clicked => { root.delete(); } } }
+                VerticalLayout { alignment: center; IconButton { label: Env.copy-label; icon: root.copied ? @image-url("icons/check.svg") : @image-url("icons/copy.svg"); visible-now: root.show-actions; clicked => { root.copy(); } } }
+                if Features.pins: VerticalLayout { alignment: center; IconButton { label: item.pinned ? Env.unpin-label : Env.pin-label; icon: @image-url("icons/pin.svg"); tint: item.pinned ? Design.pin : transparent; visible-now: root.show-actions; clicked => { root.toggle-pin(); } } }
+            }
+
+            VerticalLayout {
+                spacing: 14px;
+                alignment: start;
+                horizontal-stretch: 1;
+
+                if item.is-image: HorizontalLayout {
+                    alignment: Env.rtl ? end : start;
+                    Rectangle {
+                        width: item.thumb-width;
+                        height: item.thumb-height;
+                        border-radius: 2px;
+                        clip: true;
+                        Image { source: Thumbs.load(item.thumb-path); width: parent.width; height: parent.height; }
+                        // press + move past a few pixels = drag the image out (once per gesture)
+                        drag-area := TouchArea {
+                            property <bool> dragging;
+                            mouse-cursor: MouseCursor.pointer;
+                            // a click (no drag) copies, like the rest of the row
+                            clicked => { if !self.dragging { root.copy(); } }
+                            pointer-event(e) => {
+                                if e.kind == PointerEventKind.down { self.dragging = false; }
+                            }
+                            moved => {
+                                if self.pressed && !self.dragging
+                                    && (abs(self.mouse-x - self.pressed-x) > 4px || abs(self.mouse-y - self.pressed-y) > 4px) {
+                                    self.dragging = true;
+                                    root.drag-image();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !item.is-image && item.is-link: link := TouchArea {
+                    // the URL lines up with the other texts, the icon hangs in the margin before it
+                    mouse-cursor: pointer;
+                    accessible-role: button;
+                    accessible-label: item.link;
+                    accessible-action-default => { root.open-link(); }
+                    clicked => { root.open-link(); }
+                    height: link-text.preferred-height;
+                    link-text := Text {
+                        x: Env.touch ? 26px : 0;
+                        width: parent.width - self.x;
+                        text: item.preview;
+                        font-family: ClipText.font;
+                        font-size: ClipText.size;
+                        font-weight: Design.medium;
+                        line-height-factor: ClipText.line-factor;
+                        color: Design.link;
+                        wrap: char-wrap;
+                        overflow: elide;
+                        max-lines: 6;
+                        horizontal-alignment: Env.rtl ? right : left;
+                    }
+                    Rectangle {
+                        // underline of the first line, fades in on hover
+                        x: link-text.x;
+                        y: ClipText.line-height - 3px;
+                        width: min(link-text.preferred-width, link-text.width);
+                        height: 1px;
+                        background: Design.meta;
+                        opacity: link.has-hover ? 1 : 0;
+                        animate opacity { duration: 150ms; easing: ease-out; }
+                    }
+                    Image {
+                        source: @image-url("icons/link.svg");
+                        width: 18px;
+                        height: 18px;
+                        x: Env.touch ? 0 : Env.rtl ? parent.width + 10px : -28px;
+                        // centred on the first line
+                        y: round((ClipText.line-height - 18px) / 2 / 1px) * 1px;
+                        colorize: link.has-hover ? Design.icon-hover : Design.icon;
+                    }
+                }
+
+                if !item.is-image && !item.is-link: Rectangle {
+                    height: shown.preferred-height;
+                    clip: true;
+                    shown := Text {
+                        width: parent.width;
+                        text: item.preview;
+                        font-family: item.is-code ? ClipText.code-font : ClipText.font;
+                        font-size: item.is-code ? ClipText.code-size : ClipText.size;
+                        font-weight: item.is-code ? ClipText.code-weight : Design.medium;
+                        line-height-factor: item.is-code ? ClipText.code-line-factor : ClipText.line-factor;
+                        color: Design.text;
+                        wrap: word-wrap;
+                        overflow: elide;
+                        max-lines: 6;
+                        horizontal-alignment: item.text-rtl ? right : left;
+                    }
+                    // The same text laid over it, invisible but selectable (TextInput
+                    // cannot elide): only the selection shows. ⌘C is taken here so the
+                    // copy goes through Rust and does not become a new clip.
+                    // Created only under the mouse or while it holds a selection: a
+                    // TextInput per row costs layout and drawing on every scroll frame.
+                    if root.has-hover || root.text-active: scope := FocusScope {
+                        focus-on-click: false;
+                        focus-on-tab-navigation: false;
+                        capture-key-pressed(e) => {
+                            if (self.has-focus || selectable.has-focus)
+                                && e.modifiers.control && !e.modifiers.alt && !e.modifiers.shift
+                                && (e.text == "c" || e.text == "C") {
+                                root.copy-selection(
+                                    min(selectable.anchor-position-byte-offset, selectable.cursor-position-byte-offset),
+                                    max(selectable.anchor-position-byte-offset, selectable.cursor-position-byte-offset));
+                                return accept;
+                            }
+                            reject
+                        }
+                        // one selection at a time: it goes when the focus leaves the row
+                        changed has-focus => {
+                            root.text-active = self.has-focus || selectable.has-focus;
+                            if !root.text-active { selectable.clear-selection(); }
+                        }
+
+                        selectable := TextInput {
+                            // only as wide as the text: the empty rest of the row copies at once
+                            x: item.text-rtl ? parent.width - self.width : 0;
+                            y: 0;
+                            width: min(self.preferred-width, parent.width);
+                            height: self.preferred-height;
+                            text: item.preview;
+                            read-only: true;
+                            font-family: item.is-code ? ClipText.code-font : ClipText.font;
+                            font-size: item.is-code ? ClipText.code-size : ClipText.size;
+                            font-weight: item.is-code ? ClipText.code-weight : Design.medium;
+                            line-height-factor: item.is-code ? ClipText.code-line-factor : ClipText.line-factor;
+                            color: transparent;
+                            selection-foreground-color: Design.text;
+                            selection-background-color: Design.selection;
+                            // no caret in a read-only text (macOS would draw it in the selection colour)
+                            text-cursor-width: 0;
+                            wrap: word-wrap;
+                            horizontal-alignment: item.text-rtl ? right : left;
+                            accessible-label: item.preview;
+                            changed has-focus => {
+                                root.text-active = self.has-focus || scope.has-focus;
+                                if !self.has-focus && !scope.has-focus { self.clear-selection(); }
+                                if !self.has-focus { click-check.reports = 0; }
+                            }
+                            // A click on the text copies the row too. TextInput reports the
+                            // cursor on the press, on every move and on the release, so a
+                            // click is two reports (press, release) with nothing selected.
+                            // Decided a moment after the release: a second click there makes
+                            // it a double-click (selects a word) and copies nothing.
+                            cursor-position-changed => {
+                                click-check.reports += 1;
+                                click-check.running = false;
+                                click-check.running = true;
+                            }
+                        }
+                        click-check := Timer {
+                            /// cursor reports since the press; 1 = the button is still held
+                            property <int> reports;
+                            interval: 250ms;
+                            running: false;
+                            triggered => {
+                                self.running = false;
+                                if self.reports < 2 { return; }
+                                self.reports = 0;
+                                if selectable.has-focus && selectable.anchor-position-byte-offset == selectable.cursor-position-byte-offset {
+                                    root.release-focus();
+                                    root.copy();
+                                }
+                            }
+                        }
+                        // A focused TextInput blinks its (invisible) caret: a redraw
+                        // twice a second for as long as it keeps the focus. Once the
+                        // selection stays the same for a tick, the focus moves to the
+                        // scope and the selection is put back (losing focus collapses
+                        // it). Polled, not a `changed` handler on the cursor: that one
+                        // re-fires while the list recycles rows and loops the updates.
+                        Timer {
+                            property <int> last-anchor: -1;
+                            property <int> last-cursor: -1;
+                            interval: 400ms;
+                            running: selectable.has-focus;
+                            triggered => {
+                                let anchor = selectable.anchor-position-byte-offset;
+                                let cursor = selectable.cursor-position-byte-offset;
+                                if anchor != self.last-anchor || cursor != self.last-cursor {
+                                    self.last-anchor = anchor;
+                                    self.last-cursor = cursor;
+                                    return;
+                                }
+                                self.last-anchor = -1;
+                                self.last-cursor = -1;
+                                scope.focus();
+                                selectable.set-selection-offsets(anchor, cursor);
+                            }
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 0;
+                    if item.source.length > 0: Runs { parts: item.source; }
+                    // pinned: a red pin before the time (after it, right-to-left)
+                    HorizontalLayout {
+                        alignment: Env.rtl ? end : start;
+                        spacing: 4px;
+                        if Features.pins && item.pinned && !Env.rtl: VerticalLayout { alignment: center; Image { source: @image-url("icons/pin.svg"); width: 13px; height: 13px; colorize: Design.pin; } }
+                        Runs { parts: item.time; }
+                        if Features.pins && item.pinned && Env.rtl: VerticalLayout { alignment: center; Image { source: @image-url("icons/pin.svg"); width: 13px; height: 13px; colorize: Design.pin; } }
+                    }
+                }
+            }
+
+            if !Env.rtl: HorizontalLayout {
+                alignment: center;
+                spacing: 14px;
+                if Features.pins: VerticalLayout { alignment: center; IconButton { label: item.pinned ? Env.unpin-label : Env.pin-label; icon: @image-url("icons/pin.svg"); tint: item.pinned ? Design.pin : transparent; visible-now: root.show-actions; clicked => { root.toggle-pin(); } } }
+                VerticalLayout { alignment: center; IconButton { label: Env.copy-label; icon: root.copied ? @image-url("icons/check.svg") : @image-url("icons/copy.svg"); visible-now: root.show-actions; clicked => { root.copy(); } } }
+                VerticalLayout { alignment: center; IconButton { label: Env.delete-label; icon: @image-url("icons/delete.svg"); visible-now: root.show-actions; clicked => { root.delete(); } } }
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "Pastezo";
+    // taskbar / window-switcher icon on Windows and Linux (macOS uses the bundle icon)
+    // Windows / Linux: the chosen app icon (Settings → App Icon); macOS uses the Dock's
+    in property <image> window-icon: @image-url("../icons/128x128@2x.png");
+    icon: root.window-icon;
+    preferred-width: 900px;
+    preferred-height: 720px;
+    min-width: 480px;
+    min-height: 360px;
+    background: Design.background;
+    default-font-family: "MiSans";
+    default-font-weight: Design.regular;
+
+    in property <[ClipItem]> clips;
+    in property <bool> searching;
+    in-out property <bool> search-open;
+    out property <bool> search-focused: search-input.has-focus;
+    in-out property <string> query;
+    in property <int> copied-id: -1;
+    in property <Toast> toast;
+    in property <bool> toast-shown;
+
+    callback copy(int);
+    /// clip id, byte range of the selected text in its preview
+    callback copy-selection(int, int, int);
+    callback delete(int);
+    callback toggle-pin(int);
+    callback open-link(int);
+    callback drag-image(int);
+    callback query-edited(string);
+    callback load-more();
+    callback open-settings();
+    /// Windows, Linux: Ctrl+W / Ctrl+M / Ctrl+Q — the same keys as ⌘W, ⌘M, ⌘Q,
+    /// which on macOS go through the menus
+    callback close-window();
+    callback minimize-window();
+    callback quit();
+
+    // keyboard: the selected clip (-1: none) and what the keys do with it
+    in-out property <int> selected-id: -1;
+    /// the clip the mouse moved onto (-1: none, or the keys moved on since)
+    in-out property <int> hover-id: -1;
+    property <int> reveal-count;
+    callback move-selection(int);
+    callback copy-selected();
+    callback delete-selected();
+    /// ⌘Z / Ctrl+Z, or "Undo" in the toast: the last deleted clip comes back
+    callback undo-delete();
+    callback preview-selected();
+    /// a printable key typed outside the search field: true if it started a search
+    callback type-to-search(string) -> bool;
+
+    // preview (Space): the whole clip, text or image, over the list
+    in property <bool> preview-open;
+    in property <bool> preview-is-image;
+    in property <string> preview-text;
+    in property <bool> preview-is-code;
+    in property <image> preview-image;
+    in property <[Part]> preview-source;
+    in property <[Part]> preview-time;
+    callback close-preview();
+
+    /// Scrolls the list so the selected row (at `index`) shows: roughly first
+    /// (rows further away are not created yet), then exactly, from the row.
+    public function reveal(index: int) {
+        let estimate = index * list.content-height / max(1, root.clips.length);
+        if estimate < -list.content-y || estimate > -list.content-y + list.visible-height - 60px {
+            list.content-y = -clamp(estimate - list.visible-height / 3, 0, max(0, list.content-height - list.visible-height));
+        }
+        root.reveal-count += 1;
+        reveal-again.running = true;
+    }
+    function reveal-row(y: length, h: length) {
+        if y < -list.content-y {
+            list.content-y = -y;
+        } else if y + h > -list.content-y + list.visible-height {
+            list.content-y = -(y + h - list.visible-height);
+        }
+    }
+    /// focus back on the window's keys (from the search field, to the list)
+    public function focus-list() { keys.focus(); }
+    public function focus-search-at-end() {
+        search-input.focus();
+        search-input.set-selection-offsets(999999, 999999);
+    }
+
+    function toggle-search() {
+        root.search-open = !root.search-open;
+        if root.search-open {
+            search-input.focus();
+        } else {
+            if root.query != "" {
+                root.query = "";
+                root.query-edited("");
+            }
+            keys.focus();
+        }
+    }
+
+    // Nothing to show: one quiet line-drawn scene, centred on the window like the
+    // message, under the header. Empty history: the campfire; a search without
+    // results: the fox going through a card catalogue.
+    if root.clips.length == 0: Rectangle {
+        y: 64px;
+        height: root.height - self.y;
+        clip: true;
+        Image {
+            // the scene's middle (left free for the message) on the window's middle
+            x: (root.width - self.width) / 2;
+            y: root.height / 2 - 64px - self.height / 2;
+            width: 1600px;
+            height: 1000px;
+            source: root.searching ? @image-url("icons/empty-search.svg") : @image-url("icons/empty-scene.svg");
+            colorize: Design.field-border;
+        }
+    }
+
+    // the window's shortcuts: taken before any focused child (a text being
+    // selected in a row would otherwise swallow ⌘F)
+    init => { keys.focus(); }
+    // after a rough scroll the row is created on the next frame: ask it again
+    reveal-again := Timer {
+        interval: 16ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.reveal-count += 1;
+        }
+    }
+    keys := FocusScope {
+        capture-key-pressed(event) => {
+            // Slint reports ⌘ as `control` on macOS, so this is ⌘F there and Ctrl+F elsewhere
+            // ⌘, / Ctrl+, : settings (on macOS the app menu item handles it first)
+            if event.modifiers.control && event.text == "," {
+                root.open-settings();
+                return accept;
+            }
+            if event.modifiers.control && !event.modifiers.alt && (event.text == "f" || event.text == "F") {
+                root.toggle-search();
+                return accept;
+            }
+            if !Env.macos && event.modifiers.control && !event.modifiers.alt && (event.text == "w" || event.text == "W") {
+                root.close-window();
+                return accept;
+            }
+            if !Env.macos && event.modifiers.control && !event.modifiers.alt && (event.text == "m" || event.text == "M") {
+                root.minimize-window();
+                return accept;
+            }
+            if !Env.macos && event.modifiers.control && !event.modifiers.alt && (event.text == "q" || event.text == "Q") {
+                root.quit();
+                return accept;
+            }
+            reject
+        }
+        key-pressed(event) => {
+            if event.text == Key.Escape && root.search-open {
+                root.toggle-search();
+                return accept;
+            }
+            if event.text == Key.Escape && root.selected-id >= 0 {
+                root.selected-id = -1;
+                return accept;
+            }
+            if event.text == Key.UpArrow { root.move-selection(-1); return accept; }
+            if event.text == Key.DownArrow { root.move-selection(1); return accept; }
+            // Return and Space: the preview (⌘C copies)
+            if event.text == Key.Return { root.preview-selected(); return accept; }
+            // ⌘C / Ctrl+C with no text selected anywhere: the selected clip
+            if event.modifiers.control && (event.text == "c" || event.text == "C") { root.copy-selected(); return accept; }
+            if event.text == Key.Backspace || event.text == Key.Delete { root.delete-selected(); return accept; }
+            // the search field undoes its own typing; here: the last deletion
+            if event.modifiers.control && !event.modifiers.shift && (event.text == "z" || event.text == "Z") { root.undo-delete(); return accept; }
+            if event.text == " " { root.preview-selected(); return accept; }
+            if !event.modifiers.control && !event.modifiers.meta && !event.modifiers.alt && event.text != "" {
+                if root.type-to-search(event.text) { return accept; }
+            }
+            reject
+        }
+
+        VerticalLayout {
+            header := Rectangle {
+                height: 64px;
+                HorizontalLayout {
+                    padding-left: Env.macos ? 90px : Env.touch ? 16px : 28px;
+                    padding-right: Env.touch ? 16px : 28px;
+                    alignment: end;
+                    spacing: 0;
+                    // The field grows out of the magnifier to the left; its border and
+                    // rounded corners stay visible all the way.
+                    VerticalLayout {
+                        alignment: center;
+                        search-box := Rectangle {
+                            property <length> field-width: 240px;
+                            property <length> gap: 12px;
+                            width: root.search-open ? self.field-width + self.gap : 0;
+                            height: 28px;
+                            clip: true;
+                            animate width { duration: 220ms; easing: cubic-bezier(0.33, 1, 0.68, 1); } // ease-out-cubic
+                            Rectangle {
+                                x: 0;
+                                width: max(0px, parent.width - search-box.gap);
+                                height: 28px;
+                                clip: true;
+                                border-width: 1px;
+                                border-radius: 6px;
+                                border-color: search-input.has-focus ? Design.field-border-focus : Design.field-border;
+                                background: Design.field-background;
+                                opacity: root.search-open ? 1 : 0;
+                                animate opacity { duration: 220ms; easing: ease-out; }
+                                if root.query == "": Text {
+                                    x: 10px;
+                                    text: Env.search-placeholder;
+                                    font-size: 13px;
+                                    color: Design.placeholder;
+                                    vertical-alignment: center;
+                                    height: parent.height;
+                                }
+                                search-input := TextInput {
+                                    x: 10px;
+                                    width: parent.width - 20px;
+                                    height: parent.height;
+                                    // closed: not reachable by keyboard or mouse
+                                    enabled: root.search-open;
+                                    text <=> root.query;
+                                    font-size: 13px;
+                                    color: Design.text;
+                                    vertical-alignment: center;
+                                    single-line: true;
+                                    edited => { root.query-edited(self.text); }
+                                    key-pressed(event) => {
+                                        if event.text == Key.Escape { root.toggle-search(); return accept; }
+                                        // down to the results; Return previews the first one
+                                        if event.text == Key.DownArrow { root.focus-list(); root.move-selection(1); return accept; }
+                                        if event.text == Key.Return { root.focus-list(); root.move-selection(1); root.preview-selected(); return accept; }
+                                        reject
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // settings: on macOS in the app menu (⌘,), elsewhere a gear here
+                    if !Env.macos: VerticalLayout {
+                        alignment: center;
+                        HorizontalLayout {
+                            padding-right: 14px;
+                            IconButton {
+                                label: Env.settings-label;
+                                size: 24px;
+                                icon: @image-url("icons/settings.svg");
+                                clicked => { root.open-settings(); }
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            label: Env.search-placeholder;
+                            size: 26px;
+                            icon: @image-url("icons/search.svg");
+                            clicked => { root.toggle-search(); }
+                        }
+                    }
+                }
+            }
+
+            // the std ListView insets its content by 2px on every side; cancel that
+            Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+            list := ListView {
+                x: -2px;
+                y: -2px;
+                width: parent.width + 4px;
+                height: parent.height + 4px;
+                // No scrolling by dragging with the mouse (wheel and trackpad scroll;
+                // fingers still pan): the list would hold back every press to see if
+                // it is a pan, and a text selection would start in the wrong place.
+                mouse-drag-pan-enabled: false;
+                // macOS-style overlay indicator below instead of a permanent bar
+                vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+                horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                for item in root.clips: ClipRow {
+                    item: item;
+                    copied: item.id == root.copied-id;
+                    selected: item.id == root.selected-id;
+                    reveal: root.reveal-count;
+                    reveal-me(y, h) => { root.reveal-row(y, h); }
+                    hover-changed(old, new) => {
+                        if new >= 0 { root.hover-id = new; } else if root.hover-id == old { root.hover-id = -1; }
+                    }
+                    copy => { root.copy(item.id); }
+                    release-focus => { keys.focus(); }
+                    copy-selection(start, end) => { root.copy-selection(item.id, start, end); }
+                    delete => { root.delete(item.id); }
+                    toggle-pin => { root.toggle-pin(item.id); }
+                    open-link => { root.open-link(item.id); }
+                    drag-image => { root.drag-image(item.id); }
+                }
+                // `scrolled` (user scrolling), not `changed content-y`: the ListView moves
+                // content-y itself while it measures rows, and a change handler there
+                // re-runs its layout pass up to 10 times a frame
+                scrolled => {
+                    scroll-indicator.shown = true;
+                    fade.running = false;
+                    fade.running = true;
+                    // load the next page 600px before the end
+                    if -self.content-y + self.visible-height > self.content-height - 600px {
+                        root.load-more();
+                    }
+                }
+            }
+
+            // Overlay scroll indicator: appears while scrolling, fades out after 1 s
+            scroll-indicator := Rectangle {
+                in-out property <bool> shown;
+                property <length> track: parent.height - 4px;
+                property <length> overflow: list.content-height - list.visible-height;
+                visible: self.overflow > 0;
+                x: parent.width - self.width - 2px;
+                width: 7px;
+                height: max(24px, self.track * list.visible-height / max(1px, list.content-height));
+                y: 2px + (self.track - self.height) * clamp(-list.content-y / max(1px, self.overflow), 0, 1);
+                border-radius: 3.5px;
+                background: Design.scroll-indicator;
+                opacity: self.shown ? 1 : 0;
+                animate opacity { duration: 250ms; }
+            }
+            fade := Timer {
+                interval: 1s;
+                running: false;
+                triggered => {
+                    scroll-indicator.shown = false;
+                    self.running = false;
+                }
+            }
+            }
+        }
+    }
+
+    // empty history, or a search without results: in the middle of the window
+    if root.clips.length == 0: Text {
+        x: 24px;
+        width: root.width - 48px;
+        height: root.height;
+        text: root.searching ? Env.no-results-text : Env.empty-text;
+        font-size: 20px;
+        color: Design.meta-strong;
+        wrap: word-wrap;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    // Preview (Space): the whole clip over a dimmed list — every line of a long
+    // text (the list shows six), or the image at full size. Space, Escape or a
+    // click outside closes it.
+    if root.preview-open: Rectangle {
+        background: #00000040;
+        TouchArea { clicked => { root.close-preview(); } }
+        // its own keys while open: Space / Escape close, arrows scroll
+        FocusScope {
+            init => { self.focus(); }
+            key-pressed(e) => {
+                if e.text == " " || e.text == Key.Return || e.text == Key.Escape { root.close-preview(); return accept; }
+                if e.text == Key.DownArrow { preview-scroll.scroll-by(60px); return accept; }
+                if e.text == Key.UpArrow { preview-scroll.scroll-by(-60px); return accept; }
+                reject
+            }
+        }
+        card := Rectangle {
+            property <length> pad: 28px;
+            width: min(root.width - 80px, 760px);
+            height: min(root.height - 80px, 620px);
+            border-radius: 12px;
+            background: Design.background;
+            border-width: 1px;
+            border-color: Design.field-border;
+            // clicks on the card stay on it
+            TouchArea {}
+            preview-scroll := Flickable {
+                x: card.pad;
+                y: card.pad;
+                width: parent.width - 2 * card.pad;
+                height: parent.height - 2 * card.pad - 40px;
+                content-height: root.preview-is-image ? self.height : preview-body.preferred-height;
+                public function scroll-by(d: length) {
+                    self.content-y = -clamp(-self.content-y + d, 0, max(0, self.content-height - self.height));
+                }
+                if root.preview-is-image: Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.preview-image;
+                    image-fit: contain;
+                }
+                preview-body := Text {
+                    visible: !root.preview-is-image;
+                    width: parent.width;
+                    text: root.preview-is-image ? "" : root.preview-text;
+                    font-family: root.preview-is-code ? ClipText.code-font : ClipText.font;
+                    font-size: root.preview-is-code ? ClipText.code-size : ClipText.size;
+                    font-weight: root.preview-is-code ? ClipText.code-weight : Design.medium;
+                    line-height-factor: root.preview-is-code ? ClipText.code-line-factor : ClipText.line-factor;
+                    color: Design.text;
+                    wrap: word-wrap;
+                    horizontal-alignment: Env.rtl && !root.preview-is-code ? right : left;
+                }
+            }
+            VerticalLayout {
+                x: card.pad;
+                y: parent.height - card.pad - 34px;
+                width: parent.width - 2 * card.pad;
+                spacing: 0;
+                if root.preview-source.length > 0: Runs { parts: root.preview-source; }
+                Runs { parts: root.preview-time; }
+            }
+        }
+    }
+
+    // notification, top centre, over everything; slides down and fades in
+    ToastView {
+        toast: root.toast;
+        limit: root.width - 32px;
+        action-clicked => { root.undo-delete(); }
+        x: (root.width - self.width) / 2;
+        y: root.toast-shown ? 14px : 4px;
+        opacity: root.toast-shown ? 1 : 0;
+        visible: self.opacity > 0;
+        animate y { duration: 220ms; easing: cubic-bezier(0.33, 1, 0.68, 1); }
+        animate opacity { duration: 180ms; }
+    }
+}
+
+
+// ─── Controls ───────────────────────────────────────────────────────────────
+// Each OS gets its own standard look. Windows and Linux: Slint's standard
+// widgets (fluent, see build.rs). macOS: Slint's cupertino set is only a rough
+// copy, so these are drawn to match AppKit's own controls, measured on a
+// Retina screenshot (sizes in points, colours as AppKit draws them in light
+// and dark). Shadows are layered rectangles: the software renderer has no
+// drop shadows.
+
+/// AppKit's colours for controls
+global Aqua {
+    out property <bool> dark: Theme.dark;
+    out property <color> accent-top: #2486ff;
+    out property <color> accent-bottom: #016fff;
+    // AppKit fills with a slight gradient (#2486ff → #016fff); the software
+    // renderer draws gradients without rounded corners, so the flat middle
+    out property <color> accent: Design.accent;
+    out property <color> accent-pressed: Design.accent.darker(0.15);
+    out property <color> face: dark ? #636366 : #ffffff;
+    out property <color> face-pressed: dark ? #7a7a7e : #f0f0f0;
+    out property <color> edge: dark ? #ffffff24 : #0000001f;
+    /// the lower edge, darker: light comes from above
+    out property <color> edge-bottom: dark ? #00000066 : #0000003d;
+    out property <color> shadow: dark ? #00000040 : #0000000f;
+    out property <color> label: dark ? #ffffffd9 : #000000d9;
+    out property <color> box-off: dark ? #ffffff1a : #ffffff;
+    out property <color> box-edge: dark ? #ffffff33 : #00000040;
+    out property <color> track: dark ? #ffffff26 : #0000000f;
+    out property <color> tick: dark ? #ffffff40 : #00000033;
+    out property <color> knob: dark ? #cfcfd1 : #ffffff;
+    out property <color> destructive: dark ? #ff453a : #ff3b30;
+}
+
+/// The raised rounded face of AppKit buttons and pop-ups: a soft shadow
+/// under it, a hairline edge darker at the bottom, the face on top.
+component AquaFace inherits Rectangle {
+    in property <length> radius: 5px;
+    in property <bool> pressed;
+    Rectangle {
+        y: 1px;
+        width: parent.width;
+        height: parent.height + 0.5px;
+        border-radius: root.radius + 0.5px;
+        background: Aqua.shadow;
+    }
+    Rectangle {
+        border-radius: root.radius;
+        background: Aqua.edge-bottom;
+    }
+    Rectangle {
+        height: parent.height - 0.5px;
+        y: 0;
+        border-radius: root.radius;
+        background: Aqua.edge;
+    }
+    Rectangle {
+        x: 0.5px;
+        y: 0.5px;
+        width: parent.width - 1px;
+        height: parent.height - 1px;
+        border-radius: root.radius - 0.5px;
+        background: root.pressed ? Aqua.face-pressed : Aqua.face;
+    }
+    @children
+}
+
+/// AppKit's keyboard focus ring: the accent, soft, around the control.
+component FocusRing inherits Rectangle {
+    in property <length> radius: 5px;
+    border-radius: root.radius + 3px;
+    border-width: 3px;
+    border-color: Aqua.accent-top.with-alpha(0.5);
+}
+
+component AquaButton inherits Rectangle {
+    in property <string> text;
+    in property <string> font;
+    /// the default button: accent face, white text
+    in property <bool> primary;
+    /// a destructive action: red text (macOS 11+)
+    in property <bool> destructive;
+    callback clicked();
+
+    height: 21px;
+    min-width: max(label.preferred-width + 24px, 32px);
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    if !root.primary: AquaFace {
+        width: parent.width;
+        height: parent.height;
+        pressed: touch.pressed;
+    }
+    // no opacity for "pressed": on a layer the software renderer loses the
+    // rounded corners of a gradient; a darker gradient instead
+    if root.primary: Rectangle {
+        border-radius: 5px;
+        background: touch.pressed ? Aqua.accent-pressed : Aqua.accent;
+    }
+    label := Text {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        font-family: root.font == "" ? "MiSans" : root.font;
+        font-size: 13px;
+        color: root.primary ? #ffffff : root.destructive ? Aqua.destructive : Aqua.label;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+    // Tab reaches it (as with AppKit's keyboard navigation), Space or Return presses it
+    keys := FocusScope {
+        focus-on-click: false;
+        key-pressed(e) => {
+            if e.text == " " || e.text == Key.Return { root.clicked(); return accept; }
+            reject
+        }
+    }
+    if keys.has-focus: FocusRing { x: -3px; y: -3px; width: parent.width + 6px; height: parent.height + 6px; radius: 5px; }
+}
+
+component AquaCheckBox inherits Rectangle {
+    in property <string> text;
+    in-out property <bool> checked;
+    callback toggled();
+
+    height: 20px;
+    min-width: 14px + 7px + caption.preferred-width;
+    accessible-role: checkbox;
+    accessible-label: root.text;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.checked = !root.checked; root.toggled(); }
+    box := Rectangle {
+        x: Env.rtl ? parent.width - self.width : 0;
+        y: (parent.height - self.height) / 2;
+        width: 14px;
+        height: 14px;
+        border-radius: 3.5px;
+        // off: white with a hairline edge; on: the accent with a white check
+        background: root.checked ? Aqua.accent : Aqua.box-edge;
+        if !root.checked: Rectangle {
+            x: 0.5px;
+            y: 0.5px;
+            width: parent.width - 1px;
+            height: parent.height - 1px;
+            border-radius: 3px;
+            background: Aqua.box-off;
+        }
+        if root.checked: Image {
+            source: @image-url("icons/checkmark.svg");
+            width: 12px;
+            height: 12px;
+            colorize: #ffffff;
+        }
+    }
+    caption := Text {
+        x: Env.rtl ? 0 : box.width + 7px;
+        width: parent.width - box.width - 7px;
+        height: parent.height;
+        text: root.text;
+        font-size: 13px;
+        color: Design.text;
+        vertical-alignment: center;
+        horizontal-alignment: Env.rtl ? right : left;
+        overflow: elide;
+    }
+    TouchArea { clicked => { root.checked = !root.checked; root.toggled(); } }
+    keys := FocusScope {
+        focus-on-click: false;
+        key-pressed(e) => {
+            if e.text == " " { root.checked = !root.checked; root.toggled(); return accept; }
+            reject
+        }
+    }
+    if keys.has-focus: Rectangle {
+        x: box.x - 3px;
+        y: box.y - 3px;
+        width: box.width + 6px;
+        height: box.height + 6px;
+        border-radius: 6.5px;
+        border-width: 3px;
+        border-color: Aqua.accent-top.with-alpha(0.5);
+    }
+}
+
+/// NSSlider: a 4pt track, filled with the accent up to a round knob; with tick
+/// marks, no fill and a capsule knob. Right-to-left: the minimum is on the right.
+component AquaSlider inherits Rectangle {
+    in property <float> minimum;
+    in property <float> maximum: 1;
+    in property <float> step: 0.1;
+    in property <bool> ticks;
+    /// a tick every this much (the value still snaps to `step`)
+    in property <float> tick-step: root.step;
+    in-out property <float> value;
+    in property <string> label;
+    callback edited(float);
+
+    property <length> knob-width: root.ticks ? 9px : 20px;
+    property <length> track: self.width - self.knob-width;
+    property <float> t: (root.value - root.minimum) / max(0.0001, root.maximum - root.minimum);
+    property <float> at: Env.rtl ? 1 - root.t : root.t;
+    property <int> tick-count: round((root.maximum - root.minimum) / root.tick-step);
+
+    function fraction(x: length) -> float {
+        let f = clamp((x - root.knob-width / 2) / root.track, 0, 1);
+        return Env.rtl ? 1 - f : f;
+    }
+    function set(v: float) {
+        let snapped = clamp(root.minimum + round((v - root.minimum) / root.step) * root.step, root.minimum, root.maximum);
+        if abs(snapped - root.value) > root.step / 10 {
+            root.value = snapped;
+            root.edited(snapped);
+        }
+    }
+
+    height: 22px;
+    accessible-role: slider;
+    accessible-label: root.label;
+    accessible-value: root.value;
+    accessible-value-minimum: root.minimum;
+    accessible-value-maximum: root.maximum;
+    accessible-value-step: root.step;
+    accessible-action-increment => { root.set(root.value + root.step); }
+    accessible-action-decrement => { root.set(root.value - root.step); }
+
+    Rectangle {
+        x: root.knob-width / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.track;
+        height: 4px;
+        border-radius: 2px;
+        background: Aqua.track;
+    }
+    if !root.ticks: Rectangle {
+        x: root.knob-width / 2 + (Env.rtl ? root.track * root.at : 0);
+        y: (parent.height - self.height) / 2;
+        width: root.track * root.t;
+        height: 4px;
+        border-radius: 2px;
+        background: Aqua.accent;
+    }
+    if root.ticks: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        for i in root.tick-count + 1: Rectangle {
+            x: root.knob-width / 2 + root.track * i / max(1, root.tick-count) - 0.5px;
+            y: (parent.height - self.height) / 2;
+            width: 1px;
+            height: 8px;
+            background: Aqua.tick;
+        }
+    }
+    AquaFace {
+        x: root.track * root.at;
+        y: (parent.height - self.height) / 2;
+        width: root.knob-width;
+        height: 20px;
+        radius: root.ticks ? 4.5px : 10px;
+    }
+    TouchArea {
+        pointer-event(e) => {
+            if e.kind == PointerEventKind.down {
+                root.set(root.minimum + root.fraction(self.mouse-x) * (root.maximum - root.minimum));
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.set(root.minimum + root.fraction(self.mouse-x) * (root.maximum - root.minimum));
+            }
+        }
+    }
+    // arrows move it a step (left/right mirrored right-to-left)
+    keys := FocusScope {
+        focus-on-click: false;
+        key-pressed(e) => {
+            if e.text == Key.UpArrow || e.text == (Env.rtl ? Key.LeftArrow : Key.RightArrow) { root.set(root.value + root.step); return accept; }
+            if e.text == Key.DownArrow || e.text == (Env.rtl ? Key.RightArrow : Key.LeftArrow) { root.set(root.value - root.step); return accept; }
+            reject
+        }
+    }
+    if keys.has-focus: Rectangle {
+        x: root.track * root.at - 3px;
+        y: (parent.height - 20px) / 2 - 3px;
+        width: root.knob-width + 6px;
+        height: 26px;
+        border-radius: (root.ticks ? 4.5px : 10px) + 3px;
+        border-width: 3px;
+        border-color: Aqua.accent-top.with-alpha(0.5);
+    }
+}
+
+// ── one name per control: AppKit look on macOS, the standard widget elsewhere ──
+
+component SettingButton inherits HorizontalLayout {
+    in property <string> text;
+    in property <string> font;
+    in property <bool> danger;
+    in property <bool> filled;
+    callback clicked();
+    if Env.macos: AquaButton { text: root.text; font: root.font; primary: root.filled; destructive: root.danger; clicked => { root.clicked(); } }
+    if !Env.macos: StdButton { text: root.text; primary: root.filled; clicked => { root.clicked(); } }
+}
+
+component Checkbox inherits HorizontalLayout {
+    in property <string> text;
+    in-out property <bool> checked;
+    callback toggled(bool);
+    if Env.macos: AquaCheckBox { text: root.text; checked <=> root.checked; toggled => { root.toggled(root.checked); } }
+    if !Env.macos: StdCheckBox { text: root.text; checked <=> root.checked; toggled => { root.toggled(root.checked); } }
+}
+
+component Slider inherits HorizontalLayout {
+    in property <float> minimum;
+    in property <float> maximum: 1;
+    in property <float> step: 0.1;
+    in property <bool> ticks;
+    in property <float> tick-step: root.step;
+    in-out property <float> value;
+    in property <string> label;
+    callback edited(float);
+    if Env.macos: AquaSlider {
+        minimum: root.minimum; maximum: root.maximum; step: root.step; ticks: root.ticks; tick-step: root.tick-step;
+        label: root.label; value <=> root.value; edited(v) => { root.edited(v); }
+    }
+    if !Env.macos: StdSlider {
+        minimum: root.minimum; maximum: root.maximum; step: root.step;
+        value <=> root.value; changed(v) => { root.edited(v); }
+    }
+}
+
+/// A slider with its value after it (before it, right-to-left).
+component SliderRow inherits Rectangle {
+    in property <string> value;
+    height: 24px;
+    property <length> value-width: 70px;
+    VerticalLayout {
+        x: Env.rtl ? root.value-width + 8px : 0;
+        width: parent.width - root.value-width - 8px;
+        @children
+    }
+    Text {
+        x: Env.rtl ? 0 : parent.width - root.value-width;
+        width: root.value-width;
+        height: parent.height;
+        text: root.value;
+        font-size: 13px;
+        color: Design.meta-strong;
+        vertical-alignment: center;
+        horizontal-alignment: Env.rtl ? right : left;
+    }
+}
+
+/// "Aa" in the chosen font, on a push button (Settings → Typography).
+component FontButton inherits HorizontalLayout {
+    in property <string> font;
+    in property <string> label;
+    callback clicked();
+    SettingButton { text: "Aa"; font: root.font; clicked => { root.clicked(); } }
+}
+
+/// A row of the settings form: the label (with its colon) ends at the middle
+/// line, the controls start after it; mirrored for right-to-left languages.
+component FormRow inherits Rectangle {
+    in property <string> label;
+    in property <length> label-width: 200px;
+    height: controls.preferred-height;
+    Text {
+        x: Env.rtl ? parent.width - root.label-width : 0;
+        y: 0;
+        width: root.label-width;
+        // centred on the control (each style has its own control height)
+        height: min(controls.preferred-height, 36px);
+        text: root.label;
+        font-size: 13px;
+        color: Design.text;
+        vertical-alignment: center;
+        horizontal-alignment: Env.rtl ? left : right;
+        overflow: elide;
+    }
+    controls := VerticalLayout {
+        x: Env.rtl ? 0 : root.label-width + 8px;
+        y: 0;
+        width: parent.width - root.label-width - 8px;
+        spacing: 8px;
+        @children
+    }
+}
+
+/// Keeps a control at its own width, on the start side of the row.
+component Start inherits HorizontalLayout {
+    alignment: Env.rtl ? end : start;
+}
+
+/// An explanation under a control of the settings form.
+component FormHint inherits Text {
+    font-size: 11px;
+    color: Design.meta-strong;
+    wrap: word-wrap;
+    horizontal-alignment: Env.rtl ? right : left;
+}
+
+component FormSeparator inherits Rectangle {
+    height: 1px;
+    background: Design.separator;
+}
+
+/// A tab of the settings toolbar: icon over the label; the chosen one is
+/// accent-coloured on a grey rounded background.
+component SettingsTab inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> selected;
+    callback clicked();
+
+    width: max(64px, label.preferred-width + 20px);
+    height: 52px;
+    border-radius: 7px;
+    // grey under the mouse; the open tab is told by the accent colour
+    background: touch.has-hover ? Design.tab-selected : transparent;
+    accessible-role: tab;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    Image {
+        y: 6px;
+        source: root.icon;
+        width: 26px;
+        height: 26px;
+        colorize: root.selected ? Design.accent : Design.tab-idle;
+    }
+    label := Text {
+        y: 33px;
+        text: root.text;
+        font-size: 12px;
+        color: root.selected ? Design.accent : Design.tab-idle;
+    }
+    touch := TouchArea { mouse-cursor: MouseCursor.pointer; clicked => { root.clicked(); } }
+}
+
+/// Settings → Statistics: a white card with a title.
+component StatsCard inherits Rectangle {
+    in property <string> title;
+    in property <length> gap: 12px;
+    border-radius: 10px;
+    background: Design.stats-card;
+    VerticalLayout {
+        padding: 16px;
+        spacing: root.gap;
+        if root.title != "": Text {
+            text: root.title;
+            font-size: 13px;
+            font-weight: Design.medium;
+            color: Design.text;
+            horizontal-alignment: Env.rtl ? right : left;
+        }
+        @children
+    }
+}
+
+/// A number and what it counts ("12" over "Today").
+component StatsTile inherits StatsCard {
+    in property <string> value;
+    in property <string> label;
+    gap: 2px;
+    Text {
+        text: root.value;
+        font-size: 24px;
+        font-weight: Design.medium;
+        color: Design.text;
+        horizontal-alignment: Env.rtl ? right : left;
+    }
+    Text {
+        text: root.label;
+        font-size: 12px;
+        color: Design.meta-strong;
+        horizontal-alignment: Env.rtl ? right : left;
+    }
+}
+
+/// A coloured dot and a kind's name, under the chart.
+component StatsLegend inherits HorizontalLayout {
+    in property <color> color;
+    in property <string> text;
+    spacing: 6px;
+    VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border-radius: 4px; background: root.color; } }
+    Text { text: root.text; font-size: 11px; color: Design.meta-strong; vertical-alignment: center; }
+}
+
+/// A theme to choose: its name over a small clip in its colours.
+component ThemeCard inherits Rectangle {
+    in property <string> name;
+    in property <ThemeColors> palette;
+    in property <bool> selected;
+    callback clicked();
+
+    height: 150px;
+    border-radius: 10px;
+    background: palette.background;
+    border-width: 1px;
+    border-color: palette.border;
+    accessible-role: button;
+    accessible-label: root.name;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+
+    // A small copy of a clip in the list, in the theme's colours: what the
+    // theme actually changes (background, text, links, captions, icons).
+    VerticalLayout {
+        padding: 16px;
+        padding-top: 14px;
+        spacing: 6px;
+        alignment: start;
+        Text {
+            text: root.name;
+            font-size: 12px;
+            font-weight: Design.medium;
+            color: palette.meta-strong;
+            horizontal-alignment: Env.rtl ? right : left;
+        }
+        Text {
+            text: Env.theme-sample;
+            font-size: 15px;
+            font-weight: Design.medium;
+            color: palette.text;
+            overflow: elide;
+            horizontal-alignment: Env.rtl ? right : left;
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: Env.rtl ? end : start;
+            if !Env.rtl: Image { source: @image-url("icons/link.svg"); width: 14px; height: 14px; y: 2px; colorize: palette.icon; }
+            Text {
+                text: "pastezo.app";
+                font-size: 15px;
+                font-weight: Design.medium;
+                color: palette.link;
+            }
+            if Env.rtl: Image { source: @image-url("icons/link.svg"); width: 14px; height: 14px; y: 2px; colorize: palette.icon; }
+        }
+        VerticalLayout {
+            spacing: 0;
+            Runs { parts: Env.sample-source; color: palette.meta; strong: palette.meta-strong; }
+            Runs { parts: Env.sample-time; color: palette.meta; strong: palette.meta-strong; }
+        }
+    }
+    // chosen: a thick ring half over the edge, sun and moon in the corner
+    if root.selected: Rectangle {
+        x: -2px;
+        y: -2px;
+        width: parent.width + 4px;
+        height: parent.height + 4px;
+        border-radius: 14px;
+        border-width: 4px;
+        border-color: Design.theme-chosen;
+    }
+    if root.selected: Image {
+        x: Env.rtl ? 38px : parent.width - 54px;
+        y: 10px;
+        width: 16px;
+        height: 16px;
+        source: @image-url("icons/sun.svg");
+        colorize: Design.theme-chosen;
+    }
+    if root.selected: Image {
+        x: Env.rtl ? 13px : parent.width - 26px;
+        y: 11px;
+        width: 13px;
+        height: 13px;
+        source: @image-url("icons/moon.svg");
+        colorize: Design.theme-chosen;
+    }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+/// An app icon on offer in the settings.
+/// Settings → Statistics: copies on one day, by kind; `label`: "Mon · 16".
+export struct StatsDay {
+    label: string,
+    text: int,
+    link: int,
+    image: int,
+    total: int,
+}
+
+export struct IconChoice {
+    id: string,
+    name: string,
+    preview: image,
+}
+
+/// An app icon in the settings grid: the picture over its name; the chosen
+/// one on a grey rounded background.
+component IconTile inherits Rectangle {
+    in property <IconChoice> choice;
+    in property <bool> selected;
+    callback clicked();
+
+    width: 96px;
+    height: 118px;
+    border-radius: 10px;
+    background: root.selected ? Design.tab-selected : transparent;
+    accessible-role: button;
+    accessible-label: root.choice.name;
+    accessible-checked: root.selected;
+    accessible-action-default => { root.clicked(); }
+    Image {
+        x: 10px;
+        y: 8px;
+        width: 76px;
+        height: 76px;
+        source: root.choice.preview;
+    }
+    Text {
+        y: 90px;
+        width: parent.width;
+        text: root.choice.name;
+        font-size: 13px;
+        font-weight: Design.medium;
+        color: Design.text;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+/// A theme on offer in the settings.
+export struct ThemeChoice {
+    id: string,
+    name: string,
+    colors: ThemeColors,
+}
+
+export component SettingsWindow inherits Window {
+    title: Env.settings-title;
+    // fixed size, like macOS settings windows
+    property <length> header: (Env.macos ? 28px : 0) + 64px;
+    min-width: 640px;
+    max-width: 640px;
+    // tall enough for two rows of theme cards and a peek at the third
+    min-height: root.header + 1px + 400px;
+    max-height: root.header + 1px + 400px;
+    background: Design.settings-background;
+    default-font-family: "MiSans";
+    default-font-weight: Design.regular;
+    in property <image> window-icon: @image-url("../icons/128x128@2x.png");
+    icon: root.window-icon;
+
+    in-out property <int> tab: 0;
+    in property <[ThemeChoice]> themes;
+    /// the chosen one (the card with the ring)
+    in property <string> theme-id;
+    callback theme-chosen(string);
+    // Typography: the clips' text style (Rust saves and applies it)
+    in-out property <string> text-font;
+    in-out property <float> text-size;
+    in-out property <float> text-line;
+    in-out property <float> text-gap;
+    /// (min, max, step) of the sliders, from src/settings.rs
+    in property <[float]> size-range: [12, 24, 1];
+    in property <[float]> line-range: [1.2, 2, 0.05];
+    in property <[float]> gap-range: [8, 40, 2];
+    callback text-style-edited();
+    callback text-style-reset();
+    /// installed font families, filled when the list is first opened
+    in property <[string]> fonts;
+    callback fonts-wanted();
+    in property <[IconChoice]> icons;
+    in property <string> icon-id;
+    callback icon-chosen(string);
+    /// the user confirmed deleting the whole history
+    callback clear-history();
+    /// "Clear all" pressed once: asking to confirm
+    in-out property <bool> confirming-clear;
+    // Statistics (filled by src/stats.rs): numbers already formatted
+    in property <string> stats-total;
+    /// "copies in total" (plural of the total)
+    in property <string> stats-total-label;
+    /// "counted since Sep 28"; empty until the first copy
+    in property <string> stats-since;
+    in property <string> stats-today;
+    in property <string> stats-week;
+    in property <string> stats-month;
+    /// the last 7 days, newest first
+    in property <[StatsDay]> stats-days;
+    in property <int> stats-week-max;
+    /// copies per day over the last 30 days, oldest first
+    in property <[int]> stats-month-days;
+    in property <int> stats-month-max;
+    /// the first of those 30 days ("Aug 30")
+    in property <string> stats-month-from;
+    // Import & Export: Rust asks for the file and reports in the toast
+    callback export-history();
+    callback import-history();
+    in property <Toast> toast;
+    in property <bool> toast-shown;
+    /// General: the agent starts at login (Rust saves it and registers it)
+    in-out property <bool> launch-at-login: true;
+    callback launch-at-login-changed(bool);
+
+    /// Windows, Linux: Ctrl+W / Ctrl+M / Ctrl+Q — the same keys as ⌘W, ⌘M, ⌘Q,
+    /// which on macOS go through the menus
+    callback close-window();
+    callback minimize-window();
+    callback quit();
+
+    /// switching tabs removes the focused control: the shortcut catcher takes it back
+    function show-tab(i: int) {
+        root.tab = i;
+        shortcuts.focus();
+    }
+
+    shortcuts := FocusScope {
+        // only a catcher for the shortcut: not a Tab stop, not focused by clicks
+        focus-on-tab-navigation: false;
+        focus-on-click: false;
+        init => { self.focus(); }
+        capture-key-pressed(event) => {
+            if !Env.macos && event.modifiers.control && !event.modifiers.alt && (event.text == "w" || event.text == "W") {
+                root.close-window();
+                return accept;
+            }
+            if !Env.macos && event.modifiers.control && !event.modifiers.alt && (event.text == "m" || event.text == "M") {
+                root.minimize-window();
+                return accept;
+            }
+            if !Env.macos && event.modifiers.control && !event.modifiers.alt && (event.text == "q" || event.text == "Q") {
+                root.quit();
+                return accept;
+            }
+            reject
+        }
+        VerticalLayout {
+            Rectangle {
+                height: root.header;
+                background: Design.settings-header;
+                // on macOS the title bar is transparent (and its title hidden):
+                // the title is drawn here, in the traffic lights' row
+                if Env.macos: Text {
+                    y: 0;
+                    height: 28px;
+                    text: Env.settings-title;
+                    font-size: 13px;
+                    font-weight: Design.medium;
+                    color: Design.settings-title;
+                    vertical-alignment: center;
+                }
+                HorizontalLayout {
+                    y: Env.macos ? 28px : 6px;
+                    height: 52px;
+                    alignment: center;
+                    spacing: 6px;
+                    // right-to-left: the first tab is on the right
+                    if !Env.rtl: SettingsTab { icon: @image-url("icons/general.svg"); text: Env.tab-general; selected: root.tab == 0; clicked => { root.show-tab(0); } }
+                    if !Env.rtl: SettingsTab { icon: @image-url("icons/typography.svg"); text: Env.tab-typography; selected: root.tab == 1; clicked => { root.show-tab(1); } }
+                    if !Env.rtl: SettingsTab { icon: @image-url("icons/themes.svg"); text: Env.tab-themes; selected: root.tab == 2; clicked => { root.show-tab(2); } }
+                    if Env.rtl: SettingsTab { icon: @image-url("icons/import-export.svg"); text: Env.tab-import-export; selected: root.tab == 4; clicked => { root.show-tab(4); } }
+                    if Env.rtl: SettingsTab { icon: @image-url("icons/statistics.svg"); text: Env.tab-statistics; selected: root.tab == 5; clicked => { root.show-tab(5); } }
+                    SettingsTab { icon: @image-url("icons/app-icon.svg"); text: Env.tab-app-icon; selected: root.tab == 3; clicked => { root.show-tab(3); } }
+                    if !Env.rtl: SettingsTab { icon: @image-url("icons/statistics.svg"); text: Env.tab-statistics; selected: root.tab == 5; clicked => { root.show-tab(5); } }
+                    if !Env.rtl: SettingsTab { icon: @image-url("icons/import-export.svg"); text: Env.tab-import-export; selected: root.tab == 4; clicked => { root.show-tab(4); } }
+                    if Env.rtl: SettingsTab { icon: @image-url("icons/themes.svg"); text: Env.tab-themes; selected: root.tab == 2; clicked => { root.show-tab(2); } }
+                    if Env.rtl: SettingsTab { icon: @image-url("icons/typography.svg"); text: Env.tab-typography; selected: root.tab == 1; clicked => { root.show-tab(1); } }
+                    if Env.rtl: SettingsTab { icon: @image-url("icons/general.svg"); text: Env.tab-general; selected: root.tab == 0; clicked => { root.show-tab(0); } }
+                }
+            }
+            Rectangle { height: 1px; background: Design.header-separator; }
+
+            if root.tab == 0: VerticalLayout {
+                padding: 24px;
+                padding-left: 28px;
+                padding-right: 28px;
+                spacing: 14px;
+                alignment: start;
+                FormRow {
+                    label: Env.launch-label;
+                    Checkbox {
+                        text: Env.launch-at-login;
+                        checked <=> root.launch-at-login;
+                        toggled(on) => { root.launch-at-login-changed(on); }
+                    }
+                }
+                FormSeparator {}
+                FormRow {
+                    label: Env.history-label;
+                    // deleting everything asks once more, in an alert over the window
+                    Start {
+                        SettingButton {
+                            text: Env.clear-all;
+                            danger: true;
+                            clicked => { root.confirming-clear = true; }
+                        }
+                    }
+                }
+            }
+
+            if root.tab == 4: VerticalLayout {
+                padding: 24px;
+                padding-left: 28px;
+                padding-right: 28px;
+                spacing: 14px;
+                alignment: start;
+                VerticalLayout {
+                    spacing: 6px;
+                    FormRow {
+                        label: Env.export-label;
+                        Start { SettingButton { text: Env.export-button; clicked => { root.export-history(); } } }
+                    }
+                    FormRow { FormHint { text: Env.export-hint; } }
+                }
+                FormSeparator {}
+                VerticalLayout {
+                    spacing: 6px;
+                    FormRow {
+                        label: Env.import-label;
+                        Start { SettingButton { text: Env.import-button; clicked => { root.import-history(); } } }
+                    }
+                    FormRow { FormHint { text: Env.import-hint; } }
+                }
+            }
+
+            if root.tab == 1: VerticalLayout {
+                padding: 24px;
+                padding-left: 28px;
+                padding-right: 28px;
+                spacing: 14px;
+                alignment: start;
+                FormRow {
+                    label: Env.text-font-label;
+                    Start {
+                        spacing: 10px;
+                        if !Env.rtl: FontButton { font: root.text-font; label: Env.text-font-label; clicked => { root.fonts-wanted(); font-list.show(); } }
+                        Text {
+                            text: root.text-font;
+                            font-family: root.text-font;
+                            font-size: 13px;
+                            color: Design.text;
+                            vertical-alignment: center;
+                        }
+                        if Env.rtl: FontButton { font: root.text-font; label: Env.text-font-label; clicked => { root.fonts-wanted(); font-list.show(); } }
+                    }
+                }
+                FormSeparator {}
+                FormRow {
+                    label: Env.font-size-label;
+                    SliderRow {
+                        Slider {
+                            label: Env.font-size-label;
+                            minimum: root.size-range[0];
+                            maximum: root.size-range[1];
+                            step: root.size-range[2];
+                            value <=> root.text-size;
+                            edited => { root.text-style-edited(); }
+                        }
+                        value: Env.format-points(root.text-size);
+                    }
+                }
+                FormRow {
+                    label: Env.line-height-label;
+                    SliderRow {
+                        Slider {
+                            label: Env.line-height-label;
+                            ticks: true;
+                            minimum: root.line-range[0];
+                            maximum: root.line-range[1];
+                            step: root.line-range[2];
+                            value <=> root.text-line;
+                            edited => { root.text-style-edited(); }
+                        }
+                        value: Env.format-em(root.text-line);
+                    }
+                }
+                FormRow {
+                    label: Env.clip-spacing-label;
+                    SliderRow {
+                        Slider {
+                            label: Env.clip-spacing-label;
+                            ticks: true;
+                            minimum: root.gap-range[0];
+                            maximum: root.gap-range[1];
+                            step: root.gap-range[2];
+                            value <=> root.text-gap;
+                            edited => { root.text-style-edited(); }
+                        }
+                        value: Env.format-points(root.text-gap);
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 10px;
+                    alignment: center;
+                    SettingButton { text: Env.defaults; clicked => { root.text-style-reset(); } }
+                }
+            }
+
+            // the default icon alone, a line, then the others five to a row (like Bear);
+            // right-to-left: rows start on the right
+            if root.tab == 3: icon-grid := Flickable {
+                property <int> columns: 5;
+                property <length> cell: 100px;
+                property <length> row-height: 126px;
+                property <length> left: (self.width - self.columns * self.cell) / 2;
+                property <length> others-top: 24px + self.row-height + 25px;
+                vertical-stretch: 1;
+                content-height: self.others-top + ceil((root.icons.length - 1) / self.columns) * self.row-height + 16px;
+                for icon[i] in root.icons: IconTile {
+                    property <int> slot: i == 0 ? 0 : mod(i - 1, icon-grid.columns);
+                    property <int> column: Env.rtl ? icon-grid.columns - 1 - self.slot : self.slot;
+                    x: icon-grid.left + self.column * icon-grid.cell + (icon-grid.cell - self.width) / 2;
+                    y: i == 0 ? 24px : icon-grid.others-top + floor((i - 1) / icon-grid.columns) * icon-grid.row-height;
+                    choice: icon;
+                    selected: icon.id == root.icon-id;
+                    clicked => { root.icon-chosen(icon.id); }
+                }
+                Rectangle {
+                    x: 24px;
+                    y: 24px + icon-grid.row-height + 12px;
+                    width: icon-grid.width - 48px;
+                    height: 1px;
+                    background: Design.header-separator;
+                }
+            }
+
+            // two columns of cards, scrolled; right-to-left: the first on the right
+            if root.tab == 2: grid := Flickable {
+                property <length> gap: 18px;
+                property <length> card-width: (self.width - 48px - self.gap) / 2;
+                property <length> card-height: 150px;
+                vertical-stretch: 1;
+                content-height: 24px * 2 + ceil(root.themes.length / 2) * (self.card-height + self.gap) - self.gap;
+                for theme[i] in root.themes: ThemeCard {
+                    property <int> column: Env.rtl ? 1 - mod(i, 2) : mod(i, 2);
+                    x: 24px + self.column * (grid.card-width + grid.gap);
+                    y: 24px + floor(i / 2) * (grid.card-height + grid.gap);
+                    width: grid.card-width;
+                    height: grid.card-height;
+                    name: theme.name;
+                    palette: theme.colors;
+                    // "system": the design's light or dark one, whichever is on screen
+                    selected: theme.id == root.theme-id
+                        || (root.theme-id == "system" && theme.id == (Theme.dark ? "dark" : "light"));
+                    clicked => { root.theme-chosen(theme.id); }
+                }
+            }
+
+            if root.tab == 5: stats := Flickable {
+                vertical-stretch: 1;
+                content-height: stats-column.preferred-height;
+                stats-column := VerticalLayout {
+                    width: stats.width;
+                    padding: 24px;
+                    spacing: 14px;
+                    alignment: start;
+                    // the total, like Todoist's "374 completed tasks"
+                    VerticalLayout {
+                        spacing: 2px;
+                        HorizontalLayout {
+                            alignment: Env.rtl ? end : start;
+                            spacing: 8px;
+                            if !Env.rtl: Text { text: root.stats-total; font-size: 28px; font-weight: Design.medium; color: Design.accent; }
+                            VerticalLayout {
+                                alignment: end;
+                                padding-bottom: 5px;
+                                Text { text: root.stats-total-label; font-size: 14px; color: Design.text; }
+                            }
+                            if Env.rtl: Text { text: root.stats-total; font-size: 28px; font-weight: Design.medium; color: Design.accent; }
+                        }
+                        if root.stats-since != "": FormHint { text: root.stats-since; }
+                    }
+                    // three equal tiles (placed, not laid out: a layout sizes them by their numbers)
+                    tiles := Rectangle {
+                        height: 82px;
+                        property <length> gap: 12px;
+                        property <length> tile: (self.width - 2 * self.gap) / 3;
+                        // right to left: today on the right
+                        function x-of(i: int) -> length {
+                            return (Env.rtl ? 2 - i : i) * (self.tile + self.gap);
+                        }
+                        StatsTile { x: tiles.x-of(0); width: tiles.tile; height: tiles.height; value: root.stats-today; label: Env.stats-today-label; }
+                        StatsTile { x: tiles.x-of(1); width: tiles.tile; height: tiles.height; value: root.stats-week; label: Env.stats-week-label; }
+                        StatsTile { x: tiles.x-of(2); width: tiles.tile; height: tiles.height; value: root.stats-month; label: Env.stats-month-label; }
+                    }
+                    // the last 7 days, newest on top: a bar per day, split by kind
+                    StatsCard {
+                        title: Env.stats-by-day;
+                        for day in root.stats-days: Rectangle {
+                            // room for the "Mon · 16" after the longest bar
+                            property <length> full: self.width - 78px;
+                            property <length> unit: self.full / max(1, root.stats-week-max);
+                            property <length> text-w: day.text * self.unit;
+                            property <length> link-w: day.link * self.unit;
+                            property <length> image-w: day.image * self.unit;
+                            property <length> bar-w: day.total > 0 ? self.text-w + self.link-w + self.image-w : 3px;
+                            height: 22px;
+                            // right to left: the bars grow from the right edge
+                            function at(start: length, w: length) -> length {
+                                return Env.rtl ? self.width - start - w : start;
+                            }
+                            if day.total == 0: Rectangle {
+                                x: parent.at(0, 3px); width: 3px; height: 14px; border-radius: 1.5px;
+                                background: Design.stats-empty;
+                            }
+                            if day.text > 0: Rectangle {
+                                x: parent.at(0, parent.text-w); width: parent.text-w; height: 14px; border-radius: 2px;
+                                background: Design.stats-text;
+                            }
+                            if day.link > 0: Rectangle {
+                                x: parent.at(parent.text-w, parent.link-w); width: parent.link-w; height: 14px; border-radius: 2px;
+                                background: Design.stats-link;
+                            }
+                            if day.image > 0: Rectangle {
+                                x: parent.at(parent.text-w + parent.link-w, parent.image-w); width: parent.image-w; height: 14px; border-radius: 2px;
+                                background: Design.stats-image;
+                            }
+                            Text {
+                                x: Env.rtl ? parent.width - parent.bar-w - 8px - self.width : parent.bar-w + 8px;
+                                text: day.label;
+                                font-size: 12px;
+                                color: Design.meta-strong;
+                                vertical-alignment: center;
+                            }
+                        }
+                        HorizontalLayout {
+                            alignment: Env.rtl ? end : start;
+                            spacing: 14px;
+                            StatsLegend { color: Design.stats-text; text: Env.stats-text-label; }
+                            StatsLegend { color: Design.stats-link; text: Env.stats-link-label; }
+                            StatsLegend { color: Design.stats-image; text: Env.stats-image-label; }
+                        }
+                    }
+                    // the last 30 days: a column per day, today at the end
+                    StatsCard {
+                        title: Env.stats-month-label;
+                        month := Rectangle {
+                            height: 64px;
+                            property <length> gap: 3px;
+                            property <length> bar: (self.width - 29 * self.gap) / 30;
+                            for count[i] in root.stats-month-days: Rectangle {
+                                property <int> column: Env.rtl ? 29 - i : i;
+                                x: self.column * (month.bar + month.gap);
+                                width: month.bar;
+                                height: count > 0 ? max(3px, month.height * count / max(1, root.stats-month-max)) : 3px;
+                                y: month.height - self.height;
+                                border-radius: 2px;
+                                background: count == 0 ? Design.stats-empty
+                                    : i == 29 ? Design.stats-text : Design.stats-text.with-alpha(Theme.dark ? 0.6 : 0.45);
+                            }
+                        }
+                        HorizontalLayout {
+                            Text { text: Env.rtl ? Env.stats-today-label : root.stats-month-from; font-size: 11px; color: Design.meta-strong; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Text { text: Env.rtl ? root.stats-month-from : Env.stats-today-label; font-size: 11px; color: Design.meta-strong; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // The confirmation of "Clear all": an alert like AppKit's (app icon, question,
+    // warning, Cancel / Delete) over the dimmed window. Escape cancels, Return deletes.
+    if root.confirming-clear: Rectangle {
+        background: #00000026;
+        TouchArea {}
+        FocusScope {
+            init => { self.focus(); }
+            key-pressed(e) => {
+                if e.text == Key.Escape { root.confirming-clear = false; return accept; }
+                if e.text == Key.Return { root.confirming-clear = false; root.clear-history(); return accept; }
+                reject
+            }
+        }
+        alert := Rectangle {
+            width: 260px;
+            height: alert-content.preferred-height;
+            // a soft shadow under it (no drop shadows in the software renderer)
+            for i in [1, 2, 3]: Rectangle {
+                x: -i * 1px;
+                y: -i * 1px + 2px;
+                width: parent.width + i * 2px;
+                height: parent.height + i * 2px;
+                border-radius: 12px + i * 1px;
+                background: #00000012;
+            }
+            Rectangle {
+                border-radius: 12px;
+                background: Aqua.dark ? #353537 : #efefef;
+                border-width: 0.5px;
+                border-color: Aqua.edge-bottom;
+            }
+            alert-content := VerticalLayout {
+                padding: 18px;
+                padding-top: 20px;
+                spacing: 10px;
+                HorizontalLayout {
+                    alignment: center;
+                    Image { source: @image-url("../icons/128x128@2x.png"); width: 60px; height: 60px; }
+                }
+                Text {
+                    text: Env.clear-confirm;
+                    font-size: 13px;
+                    font-weight: Design.medium;
+                    color: Design.text;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: Env.clear-warning;
+                    font-size: 11px;
+                    color: Design.text;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                }
+                HorizontalLayout {
+                    padding-top: 6px;
+                    spacing: 8px;
+                    // right-to-left: mirrored, the destructive one stays on the outer edge
+                    if !Env.rtl: SettingButton { horizontal-stretch: 1; text: Env.cancel; clicked => { root.confirming-clear = false; } }
+                    SettingButton {
+                        horizontal-stretch: 1;
+                        text: Env.delete-label;
+                        filled: true;
+                        clicked => {
+                            root.confirming-clear = false;
+                            root.clear-history();
+                        }
+                    }
+                    if Env.rtl: SettingButton { horizontal-stretch: 1; text: Env.cancel; clicked => { root.confirming-clear = false; } }
+                }
+            }
+        }
+    }
+
+    // Import & Export reports here: top centre, under the tabs
+    ToastView {
+        toast: root.toast;
+        limit: root.width - 32px;
+        x: (root.width - self.width) / 2;
+        y: root.header + 1px + (root.toast-shown ? 14px : 4px);
+        opacity: root.toast-shown ? 1 : 0;
+        visible: self.opacity > 0;
+        animate y { duration: 220ms; easing: cubic-bezier(0.33, 1, 0.68, 1); }
+        animate opacity { duration: 180ms; }
+    }
+
+    // the installed fonts, each written in itself; under the "Aa" button
+    font-list := PopupWindow {
+        x: Env.rtl ? 24px : 236px;
+        y: root.header + 1px + 56px;
+        width: 290px;
+        height: 320px;
+        close-policy: close-on-click-outside;
+        // the look of an AppKit menu
+        Rectangle {
+            border-radius: 6px;
+            background: Aqua.dark ? #2c2c2e : #f6f6f6;
+            border-width: 0.5px;
+            border-color: Aqua.edge-bottom;
+            clip: true;
+            ListView {
+                x: 5px;
+                y: 5px;
+                width: parent.width - 10px;
+                height: parent.height - 10px;
+                for family in root.fonts: Rectangle {
+                    height: 26px;
+                    border-radius: 4px;
+                    background: hover.has-hover ? Aqua.accent : transparent;
+                    accessible-role: button;
+                    accessible-label: family;
+                    accessible-checked: family == root.text-font;
+                    accessible-action-default => { root.text-font = family; root.text-style-edited(); font-list.close(); }
+                    if family == root.text-font: Image {
+                        x: Env.rtl ? parent.width - 17px : 5px;
+                        width: 11px;
+                        height: 11px;
+                        source: @image-url("icons/checkmark.svg");
+                        colorize: hover.has-hover ? #ffffff : Aqua.label;
+                    }
+                    Text {
+                        x: Env.rtl ? 8px : 20px;
+                        width: parent.width - 28px;
+                        text: family;
+                        font-family: family;
+                        font-size: 14px;
+                        color: hover.has-hover ? #ffffff : Aqua.label;
+                        vertical-alignment: center;
+                        horizontal-alignment: Env.rtl ? right : left;
+                        overflow: elide;
+                    }
+                    hover := TouchArea {
+                        clicked => {
+                            root.text-font = family;
+                            root.text-style-edited();
+                            font-list.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
