@@ -78,13 +78,19 @@ impl<W: ToastHost> Toaster<W> {
     pub fn show(&self, kind: ToastKind, text: impl Into<slint::SharedString>) {
         let toast = Toast { kind, text: text.into(), action: Default::default() };
         let q = &self.0;
-        let busy = q.current.borrow().is_some() || q.next.running();
-        if !busy || q.current.borrow().as_ref() == Some(&toast) {
-            // the same one again ("Copied" twice) only stays longer
+        if q.current.borrow().as_ref() == Some(&toast) {
+            // the same one again ("Copied" twice) slides away and comes back:
+            // the second copy is seen too
+            q.waiting.borrow_mut().push_front((toast, duration(kind)));
+            return Queue::leave(q);
+        }
+        if q.current.borrow().is_none() && !q.next.running() {
             return Queue::display(q, toast, duration(kind));
         }
         let mut waiting = q.waiting.borrow_mut();
-        if waiting.back().is_none_or(|(last, _)| *last != toast) {
+        // not twice in a row; nor again while it slides away to come back
+        let coming_back = q.current.borrow().is_none() && waiting.front().is_some_and(|(first, _)| *first == toast);
+        if !coming_back && waiting.back().is_none_or(|(last, _)| *last != toast) {
             waiting.push_back((toast, duration(kind)));
         }
     }
@@ -157,11 +163,16 @@ mod tests {
         toaster.show(ToastKind::Error, "Export failed"); // waits once, not twice
         assert_eq!(on_screen().as_deref(), Some("Copied"));
         wait(1500);
-        toaster.show(ToastKind::Success, "Copied"); // the same again: stays longer
-        wait(1500);
-        assert_eq!(on_screen().as_deref(), Some("Copied"));
-        wait(600);
+        toaster.show(ToastKind::Success, "Copied"); // the same again: slides away and comes back
         assert_eq!(on_screen(), None, "slides away first");
+        wait(SLIDE_OUT.as_millis() as u64);
+        assert_eq!(on_screen().as_deref(), Some("Copied"));
+        toaster.show(ToastKind::Success, "Copied");
+        toaster.show(ToastKind::Success, "Copied"); // while sliding away: comes back once
+        wait(SLIDE_OUT.as_millis() as u64);
+        assert_eq!(on_screen().as_deref(), Some("Copied"));
+        wait(2000);
+        assert_eq!(on_screen(), None);
         wait(SLIDE_OUT.as_millis() as u64);
         assert_eq!(on_screen().as_deref(), Some("Export failed"));
         wait(4000 + SLIDE_OUT.as_millis() as u64 + 100);
