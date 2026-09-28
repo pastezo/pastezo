@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 (2026-09-28)
+
+### Fixes
+
+- The window no longer flashes black while scrolling or selecting text on macOS
+
 ## 0.1.1 (2026-09-28)
 
 ### Features
