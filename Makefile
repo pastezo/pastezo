@@ -4,7 +4,8 @@
 #   make linux     Linux: this machine's architecture, tar.gz — on Linux
 #   make dist      what this machine can build, plus dist/SHA256SUMS
 #   make clean     empties dist/
-#   make release   a new version from the change files (.changeset/*.md): knope bumps the
+#   make release   a new version from the change files (.changeset/*.md): first puts the
+#                  branch on top of GitHub's main (PR merge commits), then knope bumps the
 #                  version (Cargo.toml, Cargo.lock), moves the changes into CHANGELOG.md and
 #                  commits "Release v<version>". Nothing is pushed: after `git push`,
 #                  .github/workflows/release.yml builds every OS on GitHub's machines and
@@ -41,5 +42,7 @@ clean:
 
 release:
 	@ls .changeset/*.md >/dev/null 2>&1 || { echo "no change files in .changeset/: nothing to release"; exit 1; }
+	git fetch origin main
+	git rebase --autostash origin/main
 	knope release
 	@git log -1 --format='%s — push it: git push origin HEAD:main'

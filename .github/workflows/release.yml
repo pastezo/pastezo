@@ -2,16 +2,20 @@
 #   push to main with a new version (after `make release`: Cargo.toml has a version
 #       with no tag v<version> yet) → all builds → tag v<version> + a published release
 #       with the files (notes: the version's section of CHANGELOG.md)
-#   push without a new version → nothing to build
+#   push that does not touch Cargo.toml (a merged PR) → the workflow does not start
+#   push that changes Cargo.toml without a new version → nothing to build
 #   "Run workflow" button → the same; with no new version, the builds of the current
 #       main, downloadable from the run page (no release)
 # Each build job puts its files in dist/ (see the Makefile); the last job adds SHA256SUMS.
-# The tag is made only once every build passed: a failed release is retried by pushing again.
+# The tag is made only once every build passed: a failed release is retried with "Re-run"
+# on the run's page or the "Run workflow" button.
 name: Release
 
 on:
   push:
     branches: [main]
+    # only the release commit (`make release`) changes the version in Cargo.toml
+    paths: [Cargo.toml]
   workflow_dispatch:
 
 permissions:
