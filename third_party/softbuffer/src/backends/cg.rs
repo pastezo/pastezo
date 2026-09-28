@@ -6,8 +6,10 @@
 //! the window server, so there is no copy. Up to three surfaces take turns: the
 //! window server may still be compositing the previous one (fast scrolling),
 //! and a third keeps us from allocating 10 MB and redrawing everything then.
-//! Surfaces not on screen are marked purgeable after every frame and freed
-//! by `release_spare` once the window is idle, so it keeps one frame of pixels.
+//! Surfaces not on screen are freed by `release_spare` once the window is
+//! idle, so it keeps one frame of pixels. They are not marked purgeable: the
+//! system empties such a surface at once, also while the window server still
+//! shows it (a black flash when scrolling), and every frame is then redrawn.
 //! Buffer rows may be padded (IOSurface alignment): `pixels()` is
 //! `stride * height` long, the patched Slint backend derives the stride from it.
 use crate::backend_interface::*;
@@ -19,7 +21,7 @@ use objc2::{define_class, msg_send, AllocAnyThread, DefinedClass, MainThreadMark
 use objc2_core_foundation::{CFDictionary, CFNumber, CFRetained, CFString, CGPoint};
 use objc2_io_surface::{
     kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow, kIOSurfaceHeight, kIOSurfacePixelFormat,
-    kIOSurfaceWidth, IOSurfaceLockOptions, IOSurfacePurgeabilityState, IOSurfaceRef,
+    kIOSurfaceWidth, IOSurfaceLockOptions, IOSurfaceRef,
 };
 use objc2_foundation::{
     ns_string, NSDictionary, NSKeyValueChangeKey, NSKeyValueChangeNewKey,
@@ -325,13 +327,6 @@ impl<D: HasDisplayHandle, W: HasWindowHandle> SurfaceInterface<D, W> for CGImpl<
             }
         };
         let surface = self.surfaces[index].as_mut().unwrap();
-        // take the memory back from the purgeable pool; if the system reclaimed
-        // it, the old contents are gone and the frame must be drawn in full
-        let mut old = 0;
-        unsafe { surface.io.set_purgeable(IOSurfacePurgeabilityState::PurgeableNonVolatile.0, &mut old) };
-        if old == IOSurfacePurgeabilityState::PurgeableEmpty.0 {
-            surface.age = 0;
-        }
         if unsafe { surface.io.lock(IOSurfaceLockOptions::empty(), ptr::null_mut()) } != 0 {
             return Err(SoftBufferError::PlatformError(Some("IOSurfaceLock failed".into()), None));
         }
@@ -453,15 +448,11 @@ impl<D: HasDisplayHandle, W: HasWindowHandle> BufferInterface for BufferImpl<'_,
         CATransaction::commit();
 
         surface.age = 1;
-        let previous = imp.front.replace(index);
+        imp.front = Some(index);
         for (i, spare) in imp.surfaces.iter_mut().enumerate() {
             let Some(spare) = spare.as_mut().filter(|_| i != index) else { continue };
             if spare.age > 0 {
                 spare.age = spare.age.saturating_add(1);
-            }
-            // not shown any more: let the system take the memory if it needs it
-            if Some(i) == previous {
-                unsafe { spare.io.set_purgeable(IOSurfacePurgeabilityState::PurgeableVolatile.0, ptr::null_mut()) };
             }
         }
         Ok(())
