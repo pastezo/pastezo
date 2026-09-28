@@ -1,0 +1,8 @@
+[package]
+name = "pastezo-agent"
+version.workspace = true
+edition.workspace = true
+description = "Pastezo background process: records the clipboard history, has no UI"
+
+[dependencies]
+clip-core = { path = "../../crates/clip-core" }

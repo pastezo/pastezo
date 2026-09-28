@@ -1,0 +1,39 @@
+# Versions and the changelog (https://knope.tech), the way @changesets/cli works:
+#   .changeset/*.md  one file per change, written with the change (the rule in AGENTS.md;
+#                    the Stop hook .claude/hooks/changeset.mjs asks for it)
+#   make release     knope release: bumps the version (Cargo.toml + Cargo.lock), moves the
+#                    change files into CHANGELOG.md and commits "Release v<version>"
+#   git push         .github/workflows/release.yml sees a version without a tag: builds
+#                    every OS, creates the tag and the release with the files
+# One version for the whole app: [workspace.package] in Cargo.toml.
+
+[package]
+versioned_files = [
+  "Cargo.toml",
+  { path = "Cargo.lock", dependency = "pastezo" },
+  { path = "Cargo.lock", dependency = "pastezo-agent" },
+  { path = "Cargo.lock", dependency = "clip-core" },
+]
+changelog = "CHANGELOG.md"
+
+# only the change files decide the version, not the commit messages
+[changes]
+ignore_conventional_commits = true
+
+[[workflows]]
+name = "document-change"
+
+[[workflows.steps]]
+type = "CreateChangeFile"
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+# the tag and the GitHub release are made by the release workflow after the push
+[[workflows.steps]]
+type = "Command"
+command = "git commit -m \"Release vVERSION\""
+variables = { "VERSION" = "Version" }

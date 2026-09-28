@@ -1,0 +1,4 @@
+[toolchain]
+channel = "stable"
+# macOS release builds: Apple Silicon and Intel (npm run build:mac)
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]

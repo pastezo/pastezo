@@ -1,0 +1,46 @@
+[workspace]
+resolver = "2"
+members = ["crates/clip-core", "apps/pastezo", "apps/pastezo-agent"]
+exclude = ["third_party"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+# Size first (the app idles all day; code size is RAM and disk), except the
+# crates on the hot path of saving a clip, which stay at full speed.
+# Measured on a 4K image + 2000 texts: same speed as opt-level 3, ~1 MB smaller.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.release.package]
+# images: decode, preview, PNG/JPEG encode
+image = { opt-level = 3 }
+png = { opt-level = 3 }
+fdeflate = { opt-level = 3 }
+flate2 = { opt-level = 3 }
+adler2 = { opt-level = 3 }
+simd-adler32 = { opt-level = 3 }
+crc32fast = { opt-level = 3 }
+zune-jpeg = { opt-level = 3 }
+tiff = { opt-level = 3 }
+weezl = { opt-level = 3 }
+# content hash and the database
+blake3 = { opt-level = 3 }
+libsqlite3-sys = { opt-level = 3 }
+# drawing the window (software renderer): every frame of a scroll
+i-slint-renderer-software = { opt-level = 3 }
+i-slint-backend-winit = { opt-level = 3 }
+tiny-skia = { opt-level = 3 }
+
+# Local copies with a macOS memory patch: the window is presented through
+# IOSurfaces (shared with the window server, no per-frame buffers and no
+# CoreAnimation copy). See third_party/README.md.
+[patch.crates-io]
+softbuffer = { path = "third_party/softbuffer" }
+i-slint-backend-winit = { path = "third_party/i-slint-backend-winit" }
+i-slint-core = { path = "third_party/i-slint-core" }

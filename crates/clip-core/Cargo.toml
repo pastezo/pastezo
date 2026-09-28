@@ -1,0 +1,42 @@
+[package]
+name = "clip-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+blake3 = "1"
+dirs = "7"
+# decoders only where the OS clipboard needs them (see the target sections)
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+thiserror = "2"
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+image = { version = "0.25", default-features = false, features = ["tiff"] }
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSData", "NSArray", "NSDictionary", "NSEnumerator", "NSRunLoop", "NSValue"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "libc", "NSPasteboard", "NSWorkspace", "NSRunningApplication"] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFArray", "CFDictionary"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGWindow"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+image = { version = "0.25", default-features = false, features = ["bmp"] }
+clipboard-win = { version = "5", features = ["monitor"] }
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+arboard = { version = "3", default-features = false, features = ["image-data", "wayland-data-control"] }
+x11rb = { version = "0.13", features = ["xfixes"] }
+# already built for arboard's Wayland support; here: clipboard change events
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["bmp"] } # platform/dib.rs tests
+tempfile = "3"
