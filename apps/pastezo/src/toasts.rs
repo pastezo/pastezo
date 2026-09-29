@@ -1,6 +1,7 @@
 //! In-app notifications ("toasts"): a pill at the top centre of the window.
 //! One at a time, in turn: a new one waits until the current one has gone
-//! (except a toast with a button — it replaces the current one at once).
+//! (except `show_action` — it replaces the current one at once). A button
+//! after the text runs the toast's own action (`clicked`).
 //! Text always comes from the translations (`toast.*` keys).
 
 use std::cell::RefCell;
@@ -52,6 +53,12 @@ impl ToastHost for SettingsWindow {
 
 pub struct Toaster<W: ToastHost = AppWindow>(Rc<Queue<W>>);
 
+/// What a toast's button does.
+pub type Action = Rc<dyn Fn()>;
+
+/// A toast, how long it stays, what its button does.
+type Entry = (Toast, Duration, Option<Action>);
+
 struct Queue<W: ToastHost> {
     ui: slint::Weak<W>,
     /// Hides the toast on screen when its time is up.
@@ -60,7 +67,9 @@ struct Queue<W: ToastHost> {
     next: Timer,
     /// On screen now; `None` while hidden or sliding away.
     current: RefCell<Option<Toast>>,
-    waiting: RefCell<VecDeque<(Toast, Duration)>>,
+    /// the button of the one on screen
+    action: RefCell<Option<Action>>,
+    waiting: RefCell<VecDeque<Entry>>,
 }
 
 impl<W: ToastHost> Toaster<W> {
@@ -70,6 +79,7 @@ impl<W: ToastHost> Toaster<W> {
             hide: Timer::default(),
             next: Timer::default(),
             current: RefCell::new(None),
+            action: RefCell::new(None),
             waiting: RefCell::new(VecDeque::new()),
         }))
     }
@@ -77,29 +87,48 @@ impl<W: ToastHost> Toaster<W> {
     /// Shown after the ones already waiting.
     pub fn show(&self, kind: ToastKind, text: impl Into<slint::SharedString>) {
         let toast = Toast { kind, text: text.into(), action: Default::default() };
-        let q = &self.0;
-        if q.current.borrow().as_ref() == Some(&toast) {
-            // the same one again ("Copied" twice) slides away and comes back:
-            // the second copy is seen too
-            q.waiting.borrow_mut().push_front((toast, duration(kind)));
-            return Queue::leave(q);
-        }
-        if q.current.borrow().is_none() && !q.next.running() {
-            return Queue::display(q, toast, duration(kind));
-        }
-        let mut waiting = q.waiting.borrow_mut();
-        // not twice in a row; nor again while it slides away to come back
-        let coming_back = q.current.borrow().is_none() && waiting.front().is_some_and(|(first, _)| *first == toast);
-        if !coming_back && waiting.back().is_none_or(|(last, _)| *last != toast) {
-            waiting.push_back((toast, duration(kind)));
+        self.enqueue((toast, duration(kind), None));
+    }
+
+    /// With a button after the text (its label: `action`) that runs `clicked`,
+    /// shown for `time`: long enough to press it. Shown at once, in place of
+    /// the current one — for a button that is of no use later (Undo).
+    pub fn show_action(&self, kind: ToastKind, text: impl Into<slint::SharedString>, action: impl Into<slint::SharedString>, time: Duration, clicked: Action) {
+        Queue::display(&self.0, (Toast { kind, text: text.into(), action: action.into() }, time, Some(clicked)));
+    }
+
+    /// With a button, like `show_action`, but in turn after the ones on screen
+    /// and waiting: for a button that is still of use later.
+    pub fn queue_action(&self, kind: ToastKind, text: impl Into<slint::SharedString>, action: impl Into<slint::SharedString>, time: Duration, clicked: Action) {
+        self.enqueue((Toast { kind, text: text.into(), action: action.into() }, time, Some(clicked)));
+    }
+
+    /// The button of the toast on screen was pressed.
+    pub fn clicked(&self) {
+        let action = self.0.action.borrow().clone();
+        if let Some(action) = action {
+            action();
         }
     }
 
-    /// With a button after the text (its label: `action`) that the window
-    /// handles, shown for `time`: long enough to press it. Shown at once,
-    /// in place of the current one — the button would be of no use later.
-    pub fn show_action(&self, kind: ToastKind, text: impl Into<slint::SharedString>, action: impl Into<slint::SharedString>, time: Duration) {
-        Queue::display(&self.0, Toast { kind, text: text.into(), action: action.into() }, time);
+    fn enqueue(&self, entry: Entry) {
+        let q = &self.0;
+        let toast = &entry.0;
+        if q.current.borrow().as_ref() == Some(toast) {
+            // the same one again ("Copied" twice) slides away and comes back:
+            // the second copy is seen too
+            q.waiting.borrow_mut().push_front(entry);
+            return Queue::leave(q);
+        }
+        if q.current.borrow().is_none() && !q.next.running() {
+            return Queue::display(q, entry);
+        }
+        let mut waiting = q.waiting.borrow_mut();
+        // not twice in a row; nor again while it slides away to come back
+        let coming_back = q.current.borrow().is_none() && waiting.front().is_some_and(|(first, ..)| first == toast);
+        if !coming_back && waiting.back().is_none_or(|(last, ..)| last != toast) {
+            waiting.push_back(entry);
+        }
     }
 
     /// Hides the current one; the next waiting follows.
@@ -111,12 +140,13 @@ impl<W: ToastHost> Toaster<W> {
 }
 
 impl<W: ToastHost> Queue<W> {
-    fn display(q: &Rc<Self>, toast: Toast, time: Duration) {
+    fn display(q: &Rc<Self>, (toast, time, action): Entry) {
         q.next.stop();
         let Some(ui) = q.ui.upgrade() else { return };
         ui.set_toast(toast.clone());
         ui.set_toast_shown(true);
         *q.current.borrow_mut() = Some(toast);
+        *q.action.borrow_mut() = action;
         let weak = Rc::downgrade(q);
         q.hide.start(TimerMode::SingleShot, time, move || {
             if let Some(q) = weak.upgrade() {
@@ -128,6 +158,7 @@ impl<W: ToastHost> Queue<W> {
     fn leave(q: &Rc<Self>) {
         q.hide.stop();
         q.current.borrow_mut().take();
+        q.action.borrow_mut().take();
         if let Some(ui) = q.ui.upgrade() {
             ui.set_toast_shown(false);
         }
@@ -138,8 +169,8 @@ impl<W: ToastHost> Queue<W> {
         q.next.start(TimerMode::SingleShot, SLIDE_OUT, move || {
             let Some(q) = weak.upgrade() else { return };
             let next = q.waiting.borrow_mut().pop_front();
-            if let Some((toast, time)) = next {
-                Queue::display(&q, toast, time);
+            if let Some(entry) = next {
+                Queue::display(&q, entry);
             }
         });
     }
@@ -179,12 +210,31 @@ mod tests {
         assert_eq!(on_screen(), None, "nothing more waiting");
 
         // a toast with a button comes at once, the waiting ones after it
+        let pressed = Rc::new(std::cell::Cell::new(""));
+        let press = |name: &'static str| -> Action {
+            let pressed = pressed.clone();
+            Rc::new(move || pressed.set(name))
+        };
         toaster.show(ToastKind::Success, "Copied");
+        toaster.queue_action(ToastKind::Info, "Update", "Download", Duration::from_secs(8), press("download"));
         toaster.show(ToastKind::Info, "Imported");
-        toaster.show_action(ToastKind::Info, "Deleted", "Undo", Duration::from_secs(5));
+        toaster.show_action(ToastKind::Info, "Deleted", "Undo", Duration::from_secs(5), press("undo"));
         assert_eq!(on_screen().as_deref(), Some("Deleted"));
+        toaster.clicked();
+        assert_eq!(pressed.get(), "undo");
         toaster.hide();
+        toaster.clicked();
+        assert_eq!(pressed.replace(""), "undo", "nothing on screen: no button to press");
+        // a queued button waits its turn
+        wait(SLIDE_OUT.as_millis() as u64);
+        assert_eq!(on_screen().as_deref(), Some("Update"));
+        toaster.clicked();
+        assert_eq!(pressed.get(), "download");
+        wait(8000);
+        assert_eq!(on_screen(), None);
         wait(SLIDE_OUT.as_millis() as u64);
         assert_eq!(on_screen().as_deref(), Some("Imported"));
+        toaster.clicked();
+        assert_eq!(pressed.get(), "download", "a toast without a button");
     }
 }

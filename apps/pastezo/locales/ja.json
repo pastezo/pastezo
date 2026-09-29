@@ -63,5 +63,16 @@
   "stats.byDay": "過去7日間のコピー",
   "stats.text": "テキスト",
   "stats.link": "リンク",
-  "stats.image": "画像"
+  "stats.image": "画像",
+  "settings.hotkey": "ショートカット：",
+  "settings.hotkeyRecord": "ショートカットを記録",
+  "settings.hotkeyTyping": "ショートカットを入力…",
+  "settings.hotkeyClear": "消去",
+  "settings.hotkeyHint": "どのアプリからでもPastezoを開きます。",
+  "settings.hotkeyWayland": "Waylandではアプリがキーを受け取れません。システム設定で、Pastezoを起動するショートカットを追加してください。",
+  "toast.hotkeyTaken": "このショートカットは別のアプリが使用しています",
+  "toast.update": "Pastezo {version}が利用可能です",
+  "toast.download": "ダウンロード",
+  "settings.privacy": "プライバシー：",
+  "settings.hideFromCapture": "画面共有中は Pastezo を隠す"
 }

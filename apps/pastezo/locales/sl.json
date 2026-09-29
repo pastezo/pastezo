@@ -63,5 +63,16 @@
   "stats.byDay": "Kopirano v zadnjih 7 dneh",
   "stats.text": "Besedilo",
   "stats.link": "Povezave",
-  "stats.image": "Slike"
+  "stats.image": "Slike",
+  "settings.hotkey": "Bližnjica:",
+  "settings.hotkeyRecord": "Posnemi bližnjico",
+  "settings.hotkeyTyping": "Pritisnite bližnjico …",
+  "settings.hotkeyClear": "Počisti",
+  "settings.hotkeyHint": "Odpre Pastezo iz katere koli aplikacije.",
+  "settings.hotkeyWayland": "Wayland aplikacijam ne dovoli prestrezanja tipk. V sistemskih nastavitvah dodajte bližnjico, ki zažene Pastezo.",
+  "toast.hotkeyTaken": "To bližnjico uporablja druga aplikacija",
+  "toast.update": "Na voljo je Pastezo {version}",
+  "toast.download": "Prenesi",
+  "settings.privacy": "Zasebnost:",
+  "settings.hideFromCapture": "Skrij Pastezo med deljenjem zaslona"
 }

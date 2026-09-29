@@ -63,5 +63,16 @@
   "stats.byDay": "Gekopieerd in de afgelopen 7 dagen",
   "stats.text": "Tekst",
   "stats.link": "Links",
-  "stats.image": "Afbeeldingen"
+  "stats.image": "Afbeeldingen",
+  "settings.hotkey": "Toetscombinatie:",
+  "settings.hotkeyRecord": "Toetscombinatie opnemen",
+  "settings.hotkeyTyping": "Druk op toetscombinatie…",
+  "settings.hotkeyClear": "Wis",
+  "settings.hotkeyHint": "Opent Pastezo vanuit elke app.",
+  "settings.hotkeyWayland": "Wayland laat apps geen toetsen onderscheppen. Voeg in de systeeminstellingen een toetscombinatie toe die Pastezo start.",
+  "toast.hotkeyTaken": "Een andere app gebruikt deze toetscombinatie al",
+  "toast.update": "Pastezo {version} is beschikbaar",
+  "toast.download": "Download",
+  "settings.privacy": "Privacy:",
+  "settings.hideFromCapture": "Verberg Pastezo tijdens scherm delen"
 }

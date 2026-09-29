@@ -1,7 +1,7 @@
 //! Window snapshots for design checks without access to the screen:
 //! `PASTEZO_SNAPSHOT=/path/shot.png cargo run -p pastezo`, plus options:
 //! `PASTEZO_LANG`, `PASTEZO_THEME=<theme id>` (not saved),
-//! `PASTEZO_SNAPSHOT_SEARCH=<ms>`, `PASTEZO_SNAPSHOT_TOAST=<kind|undo>`,
+//! `PASTEZO_SNAPSHOT_SEARCH=<ms>`, `PASTEZO_SNAPSHOT_TOAST=<kind|undo|update>`,
 //! `PASTEZO_SNAPSHOT_REMOVE=<ms>`, `PASTEZO_SNAPSHOT_QUERY=<text>`,
 //! `PASTEZO_SNAPSHOT_SETTINGS=<tab>` (shoots the settings window instead),
 //! `PASTEZO_SNAPSHOT_CONFIRM=1` (there: "Clear all" already pressed once),
@@ -62,9 +62,11 @@ pub fn setup(ui: &AppWindow, app: &Rc<App>) {
         });
     }
     // PASTEZO_SNAPSHOT_TOAST=success|error|info|warning: show that notification;
-    // undo: the one after a deletion, with its button
+    // undo: the one after a deletion, with its button; update: a newer version is out
     if std::env::var("PASTEZO_SNAPSHOT_TOAST").as_deref() == Ok("undo") {
-        app.toaster.show_action(ToastKind::Info, app.i18n.t("toast.deleted", &[]), app.i18n.t("toast.undo", &[]), crate::UNDO_TIME);
+        app.toaster.show_action(ToastKind::Info, app.i18n.t("toast.deleted", &[]), app.i18n.t("toast.undo", &[]), crate::UNDO_TIME, Rc::new(|| {}));
+    } else if std::env::var("PASTEZO_SNAPSHOT_TOAST").as_deref() == Ok("update") {
+        app.offer_update("0.2.0");
     } else if let Ok(kind) = std::env::var("PASTEZO_SNAPSHOT_TOAST") {
         let kind = match kind.as_str() {
             "error" => ToastKind::Error,

@@ -7,9 +7,12 @@
 mod agent;
 mod app_icon;
 mod backup;
+mod capture;
 mod drag;
+mod hotkey;
 mod i18n;
 mod messages;
+mod paste;
 mod query;
 mod settings;
 mod snapshot;
@@ -20,6 +23,7 @@ mod thumbs;
 #[cfg(target_os = "linux")]
 mod xdnd;
 mod toasts;
+mod update;
 
 slint::include_modules!();
 
@@ -56,12 +60,15 @@ const UNDO_TIME: Duration = Duration::from_secs(5);
 
 /// Opens a web link in the default browser (swapped out in tests).
 type OpenUrl = Box<dyn Fn(&str)>;
+/// Steps aside and pastes into the previous app (swapped out in tests).
+type PasteInto = Box<dyn Fn(&slint::Window)>;
 
 struct App {
     ui: slint::Weak<AppWindow>,
     history: Arc<History>,
     clipboard: Arc<dyn ClipboardBackend>,
     open_url: OpenUrl,
+    paste_into: RefCell<PasteInto>,
     toaster: Toaster,
     i18n: Rc<I18n>,
     os: &'static str,
@@ -264,6 +271,33 @@ impl App {
         }
     }
 
+    /// Return, ⌘1…⌘9: the clip onto the clipboard, then into the app the
+    /// user came from (see `paste`).
+    fn paste(&self, id: i64) {
+        if let Err(e) = self.put_on_clipboard(id, None) {
+            eprintln!("pastezo: copy failed: {e}");
+            return self.toaster.show(ToastKind::Error, self.i18n.t("toast.copyFailed", &[]));
+        }
+        let Some(ui) = self.ui.upgrade() else { return };
+        if ui.get_preview_open() {
+            self.close_preview();
+        }
+        (self.paste_into.borrow())(ui.window());
+    }
+
+    fn paste_selected(&self) {
+        if let Some((_, id)) = self.selected() {
+            self.paste(id);
+        }
+    }
+
+    /// ⌘N / Ctrl+N: the N-th clip of the list (from 1), rows on their way out skipped.
+    fn paste_nth(&self, n: usize) {
+        if let Some(item) = self.model.iter().filter(|c| !c.removing).nth(n.wrapping_sub(1)) {
+            self.paste(item.id as i64);
+        }
+    }
+
     fn selected(&self) -> Option<(usize, i64)> {
         let ui = self.ui.upgrade()?;
         let id = ui.get_selected_id() as i64;
@@ -424,7 +458,15 @@ impl App {
     /// "Deleted — Undo" for `UNDO_TIME` (again after each deletion); then the
     /// deleted clips are gone for good.
     fn offer_undo(self: &Rc<Self>) {
-        self.toaster.show_action(ToastKind::Info, self.i18n.t("toast.deleted", &[]), self.i18n.t("toast.undo", &[]), UNDO_TIME);
+        let undo: toasts::Action = Rc::new({
+            let app = Rc::downgrade(self);
+            move || {
+                if let Some(app) = app.upgrade() {
+                    app.undo_delete();
+                }
+            }
+        });
+        self.toaster.show_action(ToastKind::Info, self.i18n.t("toast.deleted", &[]), self.i18n.t("toast.undo", &[]), UNDO_TIME, undo);
         let app = Rc::downgrade(self);
         self.forget.start(TimerMode::SingleShot, UNDO_TIME, move || {
             if let Some(app) = app.upgrade() {
@@ -546,6 +588,15 @@ where
     env.set_sample_time(runs(i18n.timestamp(chrono::Local::now().timestamp_millis(), chrono::Local::now()), i18n.rtl));
     env.set_launch_label(i18n.t("settings.launch", &[]).into());
     env.set_launch_at_login(i18n.t("settings.launchAtLogin", &[]).into());
+    env.set_can_hide_from_capture(capture::AVAILABLE);
+    env.set_privacy_label(i18n.t("settings.privacy", &[]).into());
+    env.set_hide_from_capture(i18n.t("settings.hideFromCapture", &[]).into());
+    env.set_hotkey_label(i18n.t("settings.hotkey", &[]).into());
+    env.set_hotkey_record(i18n.t("settings.hotkeyRecord", &[]).into());
+    env.set_hotkey_typing(i18n.t("settings.hotkeyTyping", &[]).into());
+    env.set_hotkey_clear(i18n.t("settings.hotkeyClear", &[]).into());
+    env.set_hotkey_hint(i18n.t("settings.hotkeyHint", &[]).into());
+    env.set_hotkey_wayland(i18n.t("settings.hotkeyWayland", &[]).into());
     env.set_history_label(i18n.t("settings.history", &[]).into());
     env.set_clear_all(i18n.t("settings.clearAll", &[]).into());
     env.set_clear_confirm(i18n.t("settings.clearConfirm", &[]).into());
@@ -691,6 +742,16 @@ impl App {
                 }
             }
         });
+        self.wire_hotkey(&w);
+        w.set_hide_from_capture(self.settings().hide_from_capture);
+        w.on_hide_from_capture_changed({
+            let app = Rc::downgrade(self);
+            move |on| {
+                if let Some(app) = app.upgrade() {
+                    app.set_hide_from_capture(on);
+                }
+            }
+        });
         stats::show(&w, &self.history, &self.i18n, chrono::Local::now());
         w.set_theme_id(self.settings().theme.into());
         show_text_style(&w, &self.settings().text);
@@ -809,6 +870,9 @@ impl App {
             }
         });
         let _ = w.show();
+        if self.settings().hide_from_capture {
+            capture::apply(w.window(), true);
+        }
         apply_theme(&w, self.settings().theme);
         *self.settings_toaster.borrow_mut() = Some(Toaster::new(&w));
         *self.settings_window.borrow_mut() = Some(w);
@@ -975,6 +1039,17 @@ impl App {
         }
     }
 
+    /// Settings → General: every window of ours in or out of screen captures.
+    fn set_hide_from_capture(&self, hide: bool) {
+        self.save_settings(Settings { hide_from_capture: hide, ..self.settings() });
+        if let Some(ui) = self.ui.upgrade() {
+            capture::apply(ui.window(), hide);
+        }
+        if let Some(w) = self.settings_window.borrow().as_ref() {
+            capture::apply(w.window(), hide);
+        }
+    }
+
     fn set_icon(&self, id: &str) {
         let Some(id) = app_icon::known(id) else { return };
         self.save_settings(Settings { icon: id, ..self.settings() });
@@ -1136,6 +1211,7 @@ fn wire(
         history,
         clipboard,
         open_url,
+        paste_into: RefCell::new(Box::new(paste::into_previous_app)),
         toaster: Toaster::new(ui),
         i18n,
         os,
@@ -1171,6 +1247,14 @@ fn wire(
         let app = app.clone();
         move || app.copy_selected()
     });
+    ui.on_paste_selected({
+        let app = app.clone();
+        move || app.paste_selected()
+    });
+    ui.on_paste_nth({
+        let app = app.clone();
+        move |n| app.paste_nth(n.max(0) as usize)
+    });
     ui.on_delete_selected({
         let app = app.clone();
         move || app.delete_selected()
@@ -1194,6 +1278,14 @@ fn wire(
     ui.on_undo_delete({
         let app = app.clone();
         move || app.undo_delete()
+    });
+    ui.on_toast_action({
+        let app = Rc::downgrade(&app);
+        move || {
+            if let Some(app) = app.upgrade() {
+                app.toaster.clicked();
+            }
+        }
     });
     ui.on_delete({
         let app = app.clone();
@@ -1302,6 +1394,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     agent::ensure_running();
 
     let dir = clip_core::data_dir().ok_or("no data folder on this OS")?;
+    // the global shortcut brings this window forward instead of opening another
+    let _running = clip_core::WindowLock::claim(&dir);
     // Settings → General: register (or remove) the agent's start at login
     agent::set_autostart(Settings::load(&dir).launch_at_login);
     let history = Arc::new(History::open(&dir)?);
@@ -1347,6 +1441,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         restore_window(&ui, frame);
     }
     ui.show()?;
+    // the native window exists only once shown
+    if app.settings().hide_from_capture {
+        capture::apply(ui.window(), true);
+    }
     if frame.is_some() {
         keep_on_screen(&ui);
     }
@@ -1365,6 +1463,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Ok(t) = std::env::var("PASTEZO_THEME") {
         apply_theme(&ui, &t);
     }
+    if remember_window {
+        app.check_for_update();
+    }
     slint::run_event_loop()?;
     // the window is closed: what was deleted can no longer be undone
     app.forget_deleted();
@@ -1380,7 +1481,7 @@ mod tests {
 
     /// Stands in for the system clipboard.
     #[derive(Default)]
-    struct FakeClipboard(Mutex<Option<ClipContent>>);
+    pub(crate) struct FakeClipboard(Mutex<Option<ClipContent>>);
 
     impl ClipboardBackend for FakeClipboard {
         fn change_count(&self) -> i64 {
@@ -1398,7 +1499,7 @@ mod tests {
         }
     }
 
-    fn sys() -> system::SystemInfo {
+    pub(crate) fn sys() -> system::SystemInfo {
         system::SystemInfo {
             os: "macos",
             languages: vec!["en-US".into()],
@@ -1754,7 +1855,7 @@ mod tests {
     }
 
     /// The list from the keyboard: arrows select, ⌘C copies, ⌫ deletes, typing
-    /// searches (↓ to the results), Return or Space previews the whole clip.
+    /// searches (↓ to the results), Space previews the whole clip, Return pastes.
     /// ↑/↓ start from the clip under the mouse, then go on from the selection.
     #[test]
     fn arrows_start_from_the_hovered_clip() {
@@ -1804,7 +1905,12 @@ mod tests {
         let ui = AppWindow::new().unwrap();
         ui.window().set_size(slint::LogicalSize::new(900., 720.));
         let clipboard = Arc::new(FakeClipboard::default());
-        let _app = wire(&ui, history.clone(), I18n::new(&sys()), "macos", clipboard.clone(), Box::new(|_| {}), None);
+        let app = wire(&ui, history.clone(), I18n::new(&sys()), "macos", clipboard.clone(), Box::new(|_| {}), None);
+        let pasted = Rc::new(Cell::new(0));
+        *app.paste_into.borrow_mut() = Box::new({
+            let pasted = pasted.clone();
+            move |_| pasted.set(pasted.get() + 1)
+        });
         ui.show().unwrap();
         let key = |k: slint::SharedString| {
             ui.window().dispatch_event(WindowEvent::KeyPressed { text: k.clone() });
@@ -1820,15 +1926,22 @@ mod tests {
         assert_eq!(ui.get_selected_id(), id_of(0));
         key(Key::DownArrow.into());
         assert_eq!(ui.get_selected_id(), id_of(1), "banana");
-        // Return, like Space, opens the preview; ⌘C copies
+        // Return pastes into the previous app; ⌘C only copies
         key(Key::Return.into());
+        assert_eq!(copied().as_deref(), Some("banana"));
+        assert_eq!(pasted.get(), 1);
+        // Return in the preview pastes too, and closes it
+        key(" ".into());
         assert!(ui.get_preview_open());
         key(Key::Return.into());
         assert!(!ui.get_preview_open());
+        assert_eq!(copied().as_deref(), Some("banana"));
+        assert_eq!(pasted.get(), 2);
         ui.window().dispatch_event(WindowEvent::KeyPressed { text: Key::Control.into() });
         key("c".into());
         ui.window().dispatch_event(WindowEvent::KeyReleased { text: Key::Control.into() });
         assert_eq!(copied().as_deref(), Some("banana"));
+        assert_eq!(pasted.get(), 2, "⌘C does not paste");
 
         // Space: the whole text of the long clip, not the list's preview
         key(Key::UpArrow.into());
@@ -1851,10 +1964,65 @@ mod tests {
         assert_eq!(ui.get_query().as_str(), "ap");
         testing::mock_elapsed_time(Duration::from_millis(200));
         assert_eq!(previews(&ui), ["apple"]);
-        // Return in the search field previews the first result
+        // Return in the search field pastes the first result
         key(Key::Return.into());
-        assert!(ui.get_preview_open());
-        assert_eq!(ui.get_preview_text().as_str(), "apple");
+        assert_eq!(copied().as_deref(), Some("apple"));
+        assert_eq!(pasted.get(), 3);
+    }
+
+    /// ⌘1…⌘9 paste the N-th clip of the list, from the search field too; rows
+    /// on their way out do not count.
+    #[test]
+    fn cmd_digit_pastes_the_nth_clip() {
+        use slint::platform::{Key, WindowEvent};
+        testing::init_no_event_loop();
+        let dir = tempfile::tempdir().unwrap();
+        let history = Arc::new(History::open(dir.path()).unwrap());
+        for t in ["one", "two", "three", "four"] {
+            history.add(&ClipContent::Text(t.into()), None).unwrap();
+        }
+        let ui = AppWindow::new().unwrap();
+        ui.window().set_size(slint::LogicalSize::new(900., 720.));
+        let clipboard = Arc::new(FakeClipboard::default());
+        let app = wire(&ui, history, I18n::new(&sys()), "macos", clipboard.clone(), Box::new(|_| {}), None);
+        let pasted = Rc::new(Cell::new(0));
+        *app.paste_into.borrow_mut() = Box::new({
+            let pasted = pasted.clone();
+            move |_| pasted.set(pasted.get() + 1)
+        });
+        ui.show().unwrap();
+        let cmd = |k: &str| {
+            ui.window().dispatch_event(WindowEvent::KeyPressed { text: Key::Control.into() });
+            ui.window().dispatch_event(WindowEvent::KeyPressed { text: k.into() });
+            ui.window().dispatch_event(WindowEvent::KeyReleased { text: k.into() });
+            ui.window().dispatch_event(WindowEvent::KeyReleased { text: Key::Control.into() });
+        };
+        let copied = || match clipboard.0.lock().unwrap().take() {
+            Some(ClipContent::Text(t)) => Some(t),
+            _ => None,
+        };
+
+        cmd("3");
+        assert_eq!(copied().as_deref(), Some("two"));
+        assert_eq!(pasted.get(), 1);
+        cmd("9");
+        assert_eq!((copied(), pasted.get()), (None, 1), "no 9th clip");
+        cmd("0");
+        assert_eq!((copied(), pasted.get()), (None, 1), "⌘0 is not a clip");
+
+        // the first row is being deleted: ⌘1 is the next one
+        app.delete(ui.get_clips().row_data(0).unwrap().id as i64);
+        cmd("1");
+        assert_eq!(copied().as_deref(), Some("three"));
+
+        // from the search field, among the results
+        cmd("f");
+        ui.invoke_query_edited("o".into());
+        testing::mock_elapsed_time(Duration::from_millis(200));
+        assert!(ui.get_search_focused());
+        cmd("2");
+        assert_eq!(copied().as_deref(), Some("one"));
+        assert_eq!(pasted.get(), 3);
     }
 
     /// The settings work from the keyboard (macOS controls are drawn by us):
@@ -1926,6 +2094,32 @@ mod tests {
         app.open_settings();
         let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
         assert!(!w.get_launch_at_login(), "shown as saved");
+    }
+
+    /// Settings → General → "Hide Pastezo during screen sharing": off by
+    /// default, kept in settings.json, shown again next time.
+    #[test]
+    fn hide_from_capture_is_saved() {
+        testing::init_no_event_loop();
+        let dir = tempfile::tempdir().unwrap();
+        let history = Arc::new(History::open(dir.path()).unwrap());
+        let ui = AppWindow::new().unwrap();
+        let app = wire(&ui, history, I18n::new(&sys()), "macos", Arc::new(FakeClipboard::default()), Box::new(|_| {}), Some(dir.path().into()));
+        app.open_settings();
+        let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
+        assert_eq!(Env::get(&w).get_can_hide_from_capture(), capture::AVAILABLE);
+        if !capture::AVAILABLE {
+            return;
+        }
+        assert!(!w.get_hide_from_capture(), "off by default");
+        let check = testing::ElementHandle::find_by_accessible_label(&w, "Hide Pastezo during screen sharing").next().unwrap();
+        check.invoke_accessible_default_action();
+        assert!(w.get_hide_from_capture());
+        assert!(Settings::load(dir.path()).hide_from_capture);
+        app.close_settings();
+        app.open_settings();
+        let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
+        assert!(w.get_hide_from_capture(), "shown as saved");
     }
 
     #[test]

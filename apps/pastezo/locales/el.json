@@ -63,5 +63,16 @@
   "stats.byDay": "Αντιγράφηκαν τις τελευταίες 7 ημέρες",
   "stats.text": "Κείμενο",
   "stats.link": "Σύνδεσμοι",
-  "stats.image": "Εικόνες"
+  "stats.image": "Εικόνες",
+  "settings.hotkey": "Συντόμευση:",
+  "settings.hotkeyRecord": "Καταγραφή συντόμευσης",
+  "settings.hotkeyTyping": "Πατήστε τη συντόμευση…",
+  "settings.hotkeyClear": "Διαγραφή",
+  "settings.hotkeyHint": "Ανοίγει το Pastezo από οποιαδήποτε εφαρμογή.",
+  "settings.hotkeyWayland": "Το Wayland δεν επιτρέπει στις εφαρμογές να πιάνουν πλήκτρα. Στις ρυθμίσεις συστήματος, προσθέστε μια συντόμευση που ανοίγει το Pastezo.",
+  "toast.hotkeyTaken": "Αυτή τη συντόμευση τη χρησιμοποιεί άλλη εφαρμογή",
+  "toast.update": "Το Pastezo {version} είναι διαθέσιμο",
+  "toast.download": "Λήψη",
+  "settings.privacy": "Απόρρητο:",
+  "settings.hideFromCapture": "Απόκρυψη του Pastezo κατά την κοινή χρήση οθόνης"
 }

@@ -63,5 +63,16 @@
   "stats.byDay": "Copiado nos últimos 7 dias",
   "stats.text": "Texto",
   "stats.link": "Links",
-  "stats.image": "Imagens"
+  "stats.image": "Imagens",
+  "settings.hotkey": "Atalho:",
+  "settings.hotkeyRecord": "Gravar atalho",
+  "settings.hotkeyTyping": "Pressione o atalho…",
+  "settings.hotkeyClear": "Limpar",
+  "settings.hotkeyHint": "Abre o Pastezo de qualquer app.",
+  "settings.hotkeyWayland": "O Wayland não deixa os apps capturarem teclas. Nas configurações do sistema, adicione um atalho que abra o Pastezo.",
+  "toast.hotkeyTaken": "Outro app já usa este atalho",
+  "toast.update": "O Pastezo {version} está disponível",
+  "toast.download": "Baixar",
+  "settings.privacy": "Privacidade:",
+  "settings.hideFromCapture": "Ocultar o Pastezo ao compartilhar a tela"
 }

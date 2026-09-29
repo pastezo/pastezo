@@ -63,5 +63,16 @@
   "stats.byDay": "Скопировано за 7 дней",
   "stats.text": "Текст",
   "stats.link": "Ссылки",
-  "stats.image": "Картинки"
+  "stats.image": "Картинки",
+  "settings.hotkey": "Сочетание клавиш:",
+  "settings.hotkeyRecord": "Записать сочетание",
+  "settings.hotkeyTyping": "Нажмите сочетание…",
+  "settings.hotkeyClear": "Очистить",
+  "settings.hotkeyHint": "Открывает Pastezo из любого приложения.",
+  "settings.hotkeyWayland": "Wayland не даёт приложениям перехватывать клавиши. Добавьте в настройках системы сочетание, которое запускает Pastezo.",
+  "toast.hotkeyTaken": "Это сочетание уже занято другим приложением",
+  "toast.update": "Доступна версия Pastezo {version}",
+  "toast.download": "Скачать",
+  "settings.privacy": "Приватность:",
+  "settings.hideFromCapture": "Скрывать Pastezo при демонстрации экрана"
 }

@@ -63,5 +63,16 @@
   "stats.byDay": "Đã sao chép trong 7 ngày qua",
   "stats.text": "Văn bản",
   "stats.link": "Liên kết",
-  "stats.image": "Hình ảnh"
+  "stats.image": "Hình ảnh",
+  "settings.hotkey": "Phím tắt:",
+  "settings.hotkeyRecord": "Ghi phím tắt",
+  "settings.hotkeyTyping": "Nhấn phím tắt…",
+  "settings.hotkeyClear": "Xóa",
+  "settings.hotkeyHint": "Mở Pastezo từ bất kỳ ứng dụng nào.",
+  "settings.hotkeyWayland": "Wayland không cho ứng dụng bắt phím. Trong cài đặt hệ thống, hãy thêm phím tắt khởi động Pastezo.",
+  "toast.hotkeyTaken": "Phím tắt này đang được ứng dụng khác dùng",
+  "toast.update": "Đã có Pastezo {version}",
+  "toast.download": "Tải xuống",
+  "settings.privacy": "Quyền riêng tư:",
+  "settings.hideFromCapture": "Ẩn Pastezo khi chia sẻ màn hình"
 }

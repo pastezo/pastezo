@@ -63,5 +63,16 @@
   "stats.byDay": "Nakopya sa nakaraang 7 araw",
   "stats.text": "Teksto",
   "stats.link": "Mga link",
-  "stats.image": "Mga larawan"
+  "stats.image": "Mga larawan",
+  "settings.hotkey": "Shortcut:",
+  "settings.hotkeyRecord": "I-record ang Shortcut",
+  "settings.hotkeyTyping": "Pindutin ang Shortcut…",
+  "settings.hotkeyClear": "I-clear",
+  "settings.hotkeyHint": "Binubuksan ang Pastezo mula sa anumang app.",
+  "settings.hotkeyWayland": "Hindi pinapayagan ng Wayland ang mga app na humuli ng mga key. Sa system settings, magdagdag ng shortcut na nagbubukas ng Pastezo.",
+  "toast.hotkeyTaken": "Ginagamit na ng ibang app ang shortcut na ito",
+  "toast.update": "Available na ang Pastezo {version}",
+  "toast.download": "I-download",
+  "settings.privacy": "Privacy:",
+  "settings.hideFromCapture": "Itago ang Pastezo habang nagbabahagi ng screen"
 }

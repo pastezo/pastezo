@@ -63,5 +63,16 @@
   "stats.byDay": "הועתק ב־7 הימים האחרונים",
   "stats.text": "טקסט",
   "stats.link": "קישורים",
-  "stats.image": "תמונות"
+  "stats.image": "תמונות",
+  "settings.hotkey": "קיצור מקשים:",
+  "settings.hotkeyRecord": "הקלטת קיצור",
+  "settings.hotkeyTyping": "הקישו את הקיצור…",
+  "settings.hotkeyClear": "ניקוי",
+  "settings.hotkeyHint": "פותח את Pastezo מכל יישום.",
+  "settings.hotkeyWayland": "Wayland לא מאפשר ליישומים ללכוד מקשים. בהגדרות המערכת, הוסיפו קיצור שמפעיל את Pastezo.",
+  "toast.hotkeyTaken": "יישום אחר כבר משתמש בקיצור הזה",
+  "toast.update": "Pastezo {version} זמין",
+  "toast.download": "הורדה",
+  "settings.privacy": "פרטיות:",
+  "settings.hideFromCapture": "הסתרת Pastezo בזמן שיתוף מסך"
 }

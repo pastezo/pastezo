@@ -21,10 +21,14 @@ MACOSX_DEPLOYMENT_TARGET=$min_macos cargo build --release --target "$triple" -p 
 out="$root/target/$triple/release/bundle"
 app="$out/Pastezo.app"
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp "$root/target/$triple/release/Pastezo" "$root/target/$triple/release/pastezo-agent" "$app/Contents/MacOS/"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Helpers" "$app/Contents/Resources"
+cp "$root/target/$triple/release/Pastezo" "$app/Contents/MacOS/"
+# the agent outside Contents/MacOS: there macOS would take it for the app itself
+# (the same bundle id) once it has a global shortcut — a Dock icon of its own, and
+# opening Pastezo would activate the agent instead of starting the window
+cp "$root/target/$triple/release/pastezo-agent" "$app/Contents/Helpers/"
 # symbols are not needed at runtime (the Rust toolchain's own strip may be unavailable)
-strip -x "$app/Contents/MacOS/Pastezo" "$app/Contents/MacOS/pastezo-agent" 2>/dev/null || true
+strip -x "$app/Contents/MacOS/Pastezo" "$app/Contents/Helpers/pastezo-agent" 2>/dev/null || true
 cp "$app_dir/icons/icon.icns" "$app/Contents/Resources/icon.icns"
 # the alternative app icons (Settings → App Icon), read at runtime
 mkdir -p "$app/Contents/Resources/icons"

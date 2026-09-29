@@ -63,5 +63,16 @@
   "stats.byDay": "Afritað síðustu 7 daga",
   "stats.text": "Texti",
   "stats.link": "Tenglar",
-  "stats.image": "Myndir"
+  "stats.image": "Myndir",
+  "settings.hotkey": "Flýtilykill:",
+  "settings.hotkeyRecord": "Taka upp flýtilykil",
+  "settings.hotkeyTyping": "Ýttu á flýtilykil…",
+  "settings.hotkeyClear": "Hreinsa",
+  "settings.hotkeyHint": "Opnar Pastezo úr hvaða forriti sem er.",
+  "settings.hotkeyWayland": "Wayland leyfir forritum ekki að grípa lykla. Bættu við flýtilykli í kerfisstillingum sem ræsir Pastezo.",
+  "toast.hotkeyTaken": "Annað forrit notar þennan flýtilykil",
+  "toast.update": "Pastezo {version} er í boði",
+  "toast.download": "Sækja",
+  "settings.privacy": "Persónuvernd:",
+  "settings.hideFromCapture": "Fela Pastezo við skjádeilingu"
 }

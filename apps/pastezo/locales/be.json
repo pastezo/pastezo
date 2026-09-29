@@ -63,5 +63,16 @@
   "stats.byDay": "Скапіравана за 7 дзён",
   "stats.text": "Тэкст",
   "stats.link": "Спасылкі",
-  "stats.image": "Выявы"
+  "stats.image": "Выявы",
+  "settings.hotkey": "Спалучэнне:",
+  "settings.hotkeyRecord": "Запісаць спалучэнне",
+  "settings.hotkeyTyping": "Націсніце спалучэнне…",
+  "settings.hotkeyClear": "Ачысціць",
+  "settings.hotkeyHint": "Адкрывае Pastezo з любой праграмы.",
+  "settings.hotkeyWayland": "Wayland не дазваляе праграмам перахопліваць клавішы. Дадайце ў наладах сістэмы спалучэнне, якое запускае Pastezo.",
+  "toast.hotkeyTaken": "Гэта спалучэнне ўжо заняла іншая праграма",
+  "toast.update": "Даступны Pastezo {version}",
+  "toast.download": "Спампаваць",
+  "settings.privacy": "Прыватнасць:",
+  "settings.hideFromCapture": "Хаваць Pastezo падчас дэманстрацыі экрана"
 }

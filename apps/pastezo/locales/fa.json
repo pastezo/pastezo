@@ -63,5 +63,16 @@
   "stats.byDay": "کپی‌شده در ۷ روز گذشته",
   "stats.text": "متن",
   "stats.link": "پیوندها",
-  "stats.image": "تصاویر"
+  "stats.image": "تصاویر",
+  "settings.hotkey": "میان‌بر:",
+  "settings.hotkeyRecord": "ضبط میان‌بر",
+  "settings.hotkeyTyping": "میان‌بر را بزنید…",
+  "settings.hotkeyClear": "پاک کردن",
+  "settings.hotkeyHint": "Pastezo را از هر برنامه‌ای باز می‌کند.",
+  "settings.hotkeyWayland": "Wayland به برنامه‌ها اجازه نمی‌دهد کلیدها را بگیرند. در تنظیمات سیستم، میان‌بری بسازید که Pastezo را اجرا کند.",
+  "toast.hotkeyTaken": "این میان‌بر را برنامهٔ دیگری استفاده می‌کند",
+  "toast.update": "Pastezo {version} در دسترس است",
+  "toast.download": "بارگیری",
+  "settings.privacy": "حریم خصوصی:",
+  "settings.hideFromCapture": "پنهان کردن Pastezo هنگام اشتراک‌گذاری صفحه"
 }

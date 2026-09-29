@@ -63,5 +63,16 @@
   "stats.byDay": "Zkopírováno za posledních 7 dní",
   "stats.text": "Text",
   "stats.link": "Odkazy",
-  "stats.image": "Obrázky"
+  "stats.image": "Obrázky",
+  "settings.hotkey": "Zkratka:",
+  "settings.hotkeyRecord": "Nahrát zkratku",
+  "settings.hotkeyTyping": "Stiskněte zkratku…",
+  "settings.hotkeyClear": "Vymazat",
+  "settings.hotkeyHint": "Otevře Pastezo z libovolné aplikace.",
+  "settings.hotkeyWayland": "Wayland nedovoluje aplikacím zachytávat klávesy. V nastavení systému přidejte zkratku, která spustí Pastezo.",
+  "toast.hotkeyTaken": "Tuto zkratku používá jiná aplikace",
+  "toast.update": "Je k dispozici Pastezo {version}",
+  "toast.download": "Stáhnout",
+  "settings.privacy": "Soukromí:",
+  "settings.hideFromCapture": "Skrývat Pastezo při sdílení obrazovky"
 }

@@ -63,5 +63,16 @@
   "stats.byDay": "คัดลอกใน 7 วันที่ผ่านมา",
   "stats.text": "ข้อความ",
   "stats.link": "ลิงก์",
-  "stats.image": "รูปภาพ"
+  "stats.image": "รูปภาพ",
+  "settings.hotkey": "ปุ่มลัด:",
+  "settings.hotkeyRecord": "บันทึกปุ่มลัด",
+  "settings.hotkeyTyping": "กดปุ่มลัด…",
+  "settings.hotkeyClear": "ล้าง",
+  "settings.hotkeyHint": "เปิด Pastezo จากแอปใดก็ได้",
+  "settings.hotkeyWayland": "Wayland ไม่อนุญาตให้แอปดักจับปุ่ม ในการตั้งค่าระบบ ให้เพิ่มปุ่มลัดที่เปิด Pastezo",
+  "toast.hotkeyTaken": "แอปอื่นใช้ปุ่มลัดนี้อยู่",
+  "toast.update": "Pastezo {version} พร้อมให้ใช้งานแล้ว",
+  "toast.download": "ดาวน์โหลด",
+  "settings.privacy": "ความเป็นส่วนตัว:",
+  "settings.hideFromCapture": "ซ่อน Pastezo ขณะแชร์หน้าจอ"
 }

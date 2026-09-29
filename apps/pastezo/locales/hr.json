@@ -63,5 +63,16 @@
   "stats.byDay": "Kopirano u zadnjih 7 dana",
   "stats.text": "Tekst",
   "stats.link": "Poveznice",
-  "stats.image": "Slike"
+  "stats.image": "Slike",
+  "settings.hotkey": "Prečac:",
+  "settings.hotkeyRecord": "Snimi prečac",
+  "settings.hotkeyTyping": "Pritisnite prečac…",
+  "settings.hotkeyClear": "Očisti",
+  "settings.hotkeyHint": "Otvara Pastezo iz bilo koje aplikacije.",
+  "settings.hotkeyWayland": "Wayland ne dopušta aplikacijama hvatanje tipki. U postavkama sustava dodajte prečac koji pokreće Pastezo.",
+  "toast.hotkeyTaken": "Ovaj prečac koristi druga aplikacija",
+  "toast.update": "Dostupan je Pastezo {version}",
+  "toast.download": "Preuzmi",
+  "settings.privacy": "Privatnost:",
+  "settings.hideFromCapture": "Sakrij Pastezo tijekom dijeljenja zaslona"
 }

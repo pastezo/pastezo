@@ -63,5 +63,16 @@
   "stats.byDay": "Kopiert in den letzten 7 Tagen",
   "stats.text": "Text",
   "stats.link": "Links",
-  "stats.image": "Bilder"
+  "stats.image": "Bilder",
+  "settings.hotkey": "Tastenkürzel:",
+  "settings.hotkeyRecord": "Tastenkürzel aufnehmen",
+  "settings.hotkeyTyping": "Tastenkürzel drücken …",
+  "settings.hotkeyClear": "Löschen",
+  "settings.hotkeyHint": "Öffnet Pastezo aus jeder App.",
+  "settings.hotkeyWayland": "Wayland erlaubt Apps nicht, Tasten abzufangen. Lege in den Systemeinstellungen ein Tastenkürzel an, das Pastezo startet.",
+  "toast.hotkeyTaken": "Dieses Tastenkürzel wird von einer anderen App verwendet",
+  "toast.update": "Pastezo {version} ist verfügbar",
+  "toast.download": "Laden",
+  "settings.privacy": "Datenschutz:",
+  "settings.hideFromCapture": "Pastezo bei Bildschirmfreigabe ausblenden"
 }

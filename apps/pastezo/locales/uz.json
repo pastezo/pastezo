@@ -63,5 +63,16 @@
   "stats.byDay": "Oxirgi 7 kunda nusxalandi",
   "stats.text": "Matn",
   "stats.link": "Havolalar",
-  "stats.image": "Rasmlar"
+  "stats.image": "Rasmlar",
+  "settings.hotkey": "Tezkor tugma:",
+  "settings.hotkeyRecord": "Tezkor tugmani yozib olish",
+  "settings.hotkeyTyping": "Tezkor tugmani bosing…",
+  "settings.hotkeyClear": "Tozalash",
+  "settings.hotkeyHint": "Pastezo’ni istalgan ilovadan ochadi.",
+  "settings.hotkeyWayland": "Wayland ilovalarga tugmalarni ushlashga ruxsat bermaydi. Tizim sozlamalarida Pastezo’ni ishga tushiradigan tezkor tugma qo‘shing.",
+  "toast.hotkeyTaken": "Bu tezkor tugmani boshqa ilova ishlatmoqda",
+  "toast.update": "Pastezo {version} mavjud",
+  "toast.download": "Yuklab olish",
+  "settings.privacy": "Maxfiylik:",
+  "settings.hideFromCapture": "Ekran namoyishida Pastezoʻni yashirish"
 }

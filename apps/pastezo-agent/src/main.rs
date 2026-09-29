@@ -8,7 +8,10 @@
 use std::fs::{self, File};
 use std::sync::Arc;
 
+use clip_core::platform::hotkeys::Hotkeys;
 use clip_core::platform::{release_free_memory, run_main_loop, SystemClipboard};
+#[cfg(unix)]
+use clip_core::ipc::Request;
 use clip_core::{data_dir, ClipContent, History, Watcher};
 
 fn main() {
@@ -39,18 +42,33 @@ fn main() {
     // a unit struct on some platforms, stateful on others (Linux)
     #[allow(clippy::default_constructed_unit_structs)]
     let watcher = Watcher::new(Arc::new(SystemClipboard::default()));
-    // Linux: copies made from the window go through the agent (see clip_core::ipc)
-    #[cfg(target_os = "linux")]
+    // the global shortcut that opens the window (Settings → General; none by default)
+    let hotkeys = Hotkeys::start(dir.clone()).map(Arc::new);
+    if let Some(h) = &hotkeys {
+        h.reload();
+    }
+    // window → agent requests (see clip_core::ipc): Linux copies, a changed shortcut
+    #[cfg(unix)]
     {
+        #[cfg(target_os = "linux")]
         let (history, watcher) = (history.clone(), watcher.clone());
-        let served = clip_core::ipc::serve(&dir, move |id, part| {
-            let content = history.content_of(id, part).ok().flatten();
-            content.is_some_and(|c| watcher.write(&c).is_ok())
+        let served = clip_core::ipc::serve(&dir, move |request| match request {
+            #[cfg(target_os = "linux")]
+            Request::Copy(id, part) => {
+                let content = history.content_of(id, part).ok().flatten();
+                content.is_some_and(|c| watcher.write(&c).is_ok())
+            }
+            #[cfg(not(target_os = "linux"))]
+            Request::Copy(..) => false,
+            Request::Hotkey => hotkeys.as_ref().is_some_and(|h| h.reload()),
         });
         if let Err(e) = served {
             eprintln!("pastezo-agent: ipc: {e}");
         }
     }
+    // Windows: the window messages the shortcut's own window
+    #[cfg(not(unix))]
+    let _hotkeys = hotkeys;
 
     watcher.spawn(move |content, source_app| {
         if let Err(e) = history.add(&content, source_app.as_deref()) {

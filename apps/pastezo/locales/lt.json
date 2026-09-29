@@ -63,5 +63,16 @@
   "stats.byDay": "Nukopijuota per paskutines 7 dienas",
   "stats.text": "Tekstas",
   "stats.link": "Nuorodos",
-  "stats.image": "Paveikslėliai"
+  "stats.image": "Paveikslėliai",
+  "settings.hotkey": "Spartusis klavišas:",
+  "settings.hotkeyRecord": "Įrašyti spartųjį klavišą",
+  "settings.hotkeyTyping": "Paspauskite spartųjį klavišą…",
+  "settings.hotkeyClear": "Išvalyti",
+  "settings.hotkeyHint": "Atveria Pastezo iš bet kurios programos.",
+  "settings.hotkeyWayland": "Wayland neleidžia programoms perimti klavišų. Sistemos nustatymuose pridėkite spartųjį klavišą, kuris paleidžia Pastezo.",
+  "toast.hotkeyTaken": "Šį spartųjį klavišą naudoja kita programa",
+  "toast.update": "Galima Pastezo {version}",
+  "toast.download": "Atsisiųsti",
+  "settings.privacy": "Privatumas:",
+  "settings.hideFromCapture": "Slėpti Pastezo bendrinant ekraną"
 }

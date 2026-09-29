@@ -14,8 +14,12 @@ pub struct Settings {
     pub text: TextStyle,
     /// Settings → General: the agent starts at login (`agent::set_autostart`)
     pub launch_at_login: bool,
+    /// Settings → General: screen sharing and recording do not show the windows (`capture`)
+    pub hide_from_capture: bool,
     /// The list window as it was last closed; `None`: the design's size, placed by the OS.
     pub window: Option<WindowFrame>,
+    /// Last look for a newer version (`update.rs`), ms since the epoch.
+    pub update_checked: Option<i64>,
 }
 
 /// Where the list window was and how big, to open it the same way next time.
@@ -87,7 +91,7 @@ impl Default for TextStyle {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { theme: themes::LIGHT, icon: app_icon::DEFAULT, text: TextStyle::default(), launch_at_login: true, window: None }
+        Settings { theme: themes::LIGHT, icon: app_icon::DEFAULT, text: TextStyle::default(), launch_at_login: true, hide_from_capture: false, window: None, update_checked: None }
     }
 }
 
@@ -114,6 +118,7 @@ impl Settings {
         .fitted();
         // on unless turned off (settings from before the switch worked have none)
         let launch_at_login = json.get("launchAtLogin").and_then(|v| v.as_bool()).unwrap_or(true);
+        let hide_from_capture = json.get("hideFromCapture").and_then(|v| v.as_bool()).unwrap_or(false);
         let window = json.get("window").and_then(|w| {
             let num = |k: &str| w.get(k).and_then(|v| v.as_f64()).filter(|v| v.is_finite());
             let (width, height) = (num("width")? as f32, num("height")? as f32);
@@ -128,7 +133,8 @@ impl Settings {
             let maximized = w.get("maximized").and_then(|v| v.as_bool()).unwrap_or(false);
             Some(WindowFrame { width, height, position, maximized })
         });
-        Settings { theme, icon, text, launch_at_login, window }
+        let update_checked = json.get("updateChecked").and_then(|v| v.as_i64());
+        Settings { theme, icon, text, launch_at_login, hide_from_capture, window, update_checked }
     }
 
     pub fn save(&self, dir: &Path) -> std::io::Result<()> {
@@ -138,6 +144,7 @@ impl Settings {
             "icon": self.icon,
             "text": { "font": t.font, "size": t.size, "line": t.line, "gap": t.gap },
             "launchAtLogin": self.launch_at_login,
+            "hideFromCapture": self.hide_from_capture,
         });
         if let Some(w) = &self.window {
             let mut frame = serde_json::json!({ "width": w.width, "height": w.height, "maximized": w.maximized });
@@ -147,6 +154,9 @@ impl Settings {
                 frame["scale"] = scale.into();
             }
             json["window"] = frame;
+        }
+        if let Some(t) = self.update_checked {
+            json["updateChecked"] = t.into();
         }
         std::fs::write(file(dir), serde_json::to_string_pretty(&json)? + "\n")
     }
@@ -162,7 +172,7 @@ mod tests {
         assert_eq!(Settings::load(dir.path()), Settings::default());
         let text = TextStyle { font: "Helvetica".into(), size: 20.0, line: 1.65, gap: 14.0 };
         let window = Some(WindowFrame { width: 1000.0, height: 800.0, position: Some((-1200, 40, 2.0)), maximized: false });
-        let s = Settings { theme: "nightshade", icon: "sky", text, launch_at_login: false, window };
+        let s = Settings { theme: "nightshade", icon: "sky", text, launch_at_login: false, hide_from_capture: true, window, update_checked: Some(1_790_000_000_000) };
         s.save(dir.path()).unwrap();
         assert_eq!(Settings::load(dir.path()), s);
         // a theme that no longer exists: back to the default

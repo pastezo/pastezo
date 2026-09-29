@@ -5,11 +5,14 @@
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+/// Next to the window's executable; in the macOS app `Contents/Helpers/`
+/// (see `scripts/bundle-macos.sh`).
 fn agent_path() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let name = if cfg!(windows) { "pastezo-agent.exe" } else { "pastezo-agent" };
-    let path = exe.parent()?.join(name);
-    path.exists().then_some(path)
+    let dir = exe.parent()?;
+    let helpers = dir.parent().map(|contents| contents.join("Helpers").join(name)).filter(|_| cfg!(target_os = "macos"));
+    [helpers, Some(dir.join(name))].into_iter().flatten().find(|p| p.exists())
 }
 
 pub fn ensure_running() {
@@ -210,6 +213,6 @@ mod tests {
     #[test]
     fn dev_builds_are_not_registered() {
         assert!(!super::is_installed(std::path::Path::new("/Users/me/pastezo/target/release/pastezo-agent")));
-        assert!(super::is_installed(std::path::Path::new("/Applications/Pastezo.app/Contents/MacOS/pastezo-agent")));
+        assert!(super::is_installed(std::path::Path::new("/Applications/Pastezo.app/Contents/Helpers/pastezo-agent")));
     }
 }

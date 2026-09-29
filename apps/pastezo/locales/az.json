@@ -63,5 +63,16 @@
   "stats.byDay": "Son 7 gündə kopyalananlar",
   "stats.text": "Mətn",
   "stats.link": "Keçidlər",
-  "stats.image": "Şəkillər"
+  "stats.image": "Şəkillər",
+  "settings.hotkey": "Qısayol:",
+  "settings.hotkeyRecord": "Qısayolu yaz",
+  "settings.hotkeyTyping": "Qısayolu basın…",
+  "settings.hotkeyClear": "Təmizlə",
+  "settings.hotkeyHint": "Pastezo-nu istənilən tətbiqdən açır.",
+  "settings.hotkeyWayland": "Wayland tətbiqlərə düymələri tutmağa icazə vermir. Sistem ayarlarında Pastezo-nu açan qısayol əlavə edin.",
+  "toast.hotkeyTaken": "Bu qısayolu başqa tətbiq istifadə edir",
+  "toast.update": "Pastezo {version} mövcuddur",
+  "toast.download": "Endir",
+  "settings.privacy": "Məxfilik:",
+  "settings.hideFromCapture": "Ekran paylaşımı zamanı Pastezo-nu gizlət"
 }

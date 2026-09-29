@@ -63,5 +63,16 @@
   "stats.byDay": "Másolva az elmúlt 7 napban",
   "stats.text": "Szöveg",
   "stats.link": "Linkek",
-  "stats.image": "Képek"
+  "stats.image": "Képek",
+  "settings.hotkey": "Billentyűparancs:",
+  "settings.hotkeyRecord": "Billentyűparancs rögzítése",
+  "settings.hotkeyTyping": "Nyomja le a billentyűparancsot…",
+  "settings.hotkeyClear": "Törlés",
+  "settings.hotkeyHint": "Bármelyik alkalmazásból megnyitja a Pastezót.",
+  "settings.hotkeyWayland": "A Wayland nem engedi, hogy az alkalmazások billentyűket fogjanak el. A rendszerbeállításokban adjon hozzá egy billentyűparancsot, amely elindítja a Pastezót.",
+  "toast.hotkeyTaken": "Ezt a billentyűparancsot egy másik alkalmazás használja",
+  "toast.update": "Elérhető a Pastezo {version}",
+  "toast.download": "Letöltés",
+  "settings.privacy": "Adatvédelem:",
+  "settings.hideFromCapture": "Pastezo elrejtése képernyőmegosztáskor"
 }

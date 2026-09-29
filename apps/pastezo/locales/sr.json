@@ -63,5 +63,16 @@
   "stats.byDay": "Копирано у последњих 7 дана",
   "stats.text": "Текст",
   "stats.link": "Линкови",
-  "stats.image": "Слике"
+  "stats.image": "Слике",
+  "settings.hotkey": "Пречица:",
+  "settings.hotkeyRecord": "Сними пречицу",
+  "settings.hotkeyTyping": "Притисните пречицу…",
+  "settings.hotkeyClear": "Обриши",
+  "settings.hotkeyHint": "Отвара Pastezo из било које апликације.",
+  "settings.hotkeyWayland": "Wayland не дозвољава апликацијама да хватају тастере. У подешавањима система додајте пречицу која покреће Pastezo.",
+  "toast.hotkeyTaken": "Ову пречицу користи друга апликација",
+  "toast.update": "Доступан је Pastezo {version}",
+  "toast.download": "Преузми",
+  "settings.privacy": "Приватност:",
+  "settings.hideFromCapture": "Сакриј Pastezo током дељења екрана"
 }
