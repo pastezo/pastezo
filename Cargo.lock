@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "clip-core"
-version = "0.1.2"
+version = "1.0.0"
 dependencies = [
  "arboard",
  "blake3",
@@ -3290,7 +3290,7 @@ dependencies = [
 
 [[package]]
 name = "pastezo"
-version = "0.1.2"
+version = "1.0.0"
 dependencies = [
  "base64",
  "chrono",
@@ -3324,7 +3324,7 @@ dependencies = [
 
 [[package]]
 name = "pastezo-agent"
-version = "0.1.2"
+version = "1.0.0"
 dependencies = [
  "clip-core",
 ]

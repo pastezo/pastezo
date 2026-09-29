@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0 (2026-09-29)
+
+### Features
+
+- Set a shortcut in Settings → General to open Pastezo from any app (on Linux under X11; Wayland apps can’t catch keys)
+- Settings → General can hide Pastezo from screen sharing, recordings and screenshots on macOS and Windows
+- ⌘1…⌘9 (Ctrl+1…9 on Windows and Linux) paste the first nine clips of the list
+- Return pastes the selected clip straight into the app you came from
+- When a new version is out, Pastezo says so once a day when its window opens, with a Download button
+
 ## 0.1.2 (2026-09-28)
 
 ### Fixes

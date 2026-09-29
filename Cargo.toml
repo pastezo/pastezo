@@ -5,7 +5,7 @@ exclude = ["third_party"]
 
 [workspace.package]
 edition = "2021"
-version = "0.1.2"
+version = "1.0.0"
 
 # Size first (the app idles all day; code size is RAM and disk), except the
 # crates on the hot path of saving a clip, which stay at full speed.
