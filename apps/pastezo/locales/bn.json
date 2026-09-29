@@ -63,5 +63,16 @@
   "stats.byDay": "গত ৭ দিনে কপি করা হয়েছে",
   "stats.text": "টেক্সট",
   "stats.link": "লিঙ্ক",
-  "stats.image": "ছবি"
+  "stats.image": "ছবি",
+  "settings.hotkey": "শর্টকাট:",
+  "settings.hotkeyRecord": "শর্টকাট রেকর্ড করুন",
+  "settings.hotkeyTyping": "শর্টকাট টিপুন…",
+  "settings.hotkeyClear": "মুছুন",
+  "settings.hotkeyHint": "যেকোনো অ্যাপ থেকে Pastezo খোলে।",
+  "settings.hotkeyWayland": "Wayland অ্যাপগুলোকে কী ধরতে দেয় না। সিস্টেম সেটিংসে এমন একটি শর্টকাট যোগ করুন যা Pastezo চালু করে।",
+  "toast.hotkeyTaken": "এই শর্টকাট অন্য একটি অ্যাপ ব্যবহার করছে",
+  "toast.update": "Pastezo {version} পাওয়া যাচ্ছে",
+  "toast.download": "ডাউনলোড",
+  "settings.privacy": "গোপনীয়তা:",
+  "settings.hideFromCapture": "স্ক্রিন শেয়ারের সময় Pastezo লুকান"
 }

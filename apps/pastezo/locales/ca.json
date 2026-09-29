@@ -63,5 +63,16 @@
   "stats.byDay": "Copiat els últims 7 dies",
   "stats.text": "Text",
   "stats.link": "Enllaços",
-  "stats.image": "Imatges"
+  "stats.image": "Imatges",
+  "settings.hotkey": "Drecera:",
+  "settings.hotkeyRecord": "Enregistra la drecera",
+  "settings.hotkeyTyping": "Premeu la drecera…",
+  "settings.hotkeyClear": "Esborra",
+  "settings.hotkeyHint": "Obre el Pastezo des de qualsevol app.",
+  "settings.hotkeyWayland": "Wayland no permet que les apps capturin tecles. A la configuració del sistema, afegiu una drecera que obri el Pastezo.",
+  "toast.hotkeyTaken": "Una altra app ja fa servir aquesta drecera",
+  "toast.update": "El Pastezo {version} està disponible",
+  "toast.download": "Baixa",
+  "settings.privacy": "Privadesa:",
+  "settings.hideFromCapture": "Amaga Pastezo en compartir la pantalla"
 }

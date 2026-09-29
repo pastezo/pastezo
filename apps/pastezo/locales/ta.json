@@ -63,5 +63,16 @@
   "stats.byDay": "கடந்த 7 நாட்களில் நகலெடுக்கப்பட்டவை",
   "stats.text": "உரை",
   "stats.link": "இணைப்புகள்",
-  "stats.image": "படங்கள்"
+  "stats.image": "படங்கள்",
+  "settings.hotkey": "குறுக்குவழி:",
+  "settings.hotkeyRecord": "குறுக்குவழியைப் பதிவுசெய்",
+  "settings.hotkeyTyping": "குறுக்குவழியை அழுத்தவும்…",
+  "settings.hotkeyClear": "அழி",
+  "settings.hotkeyHint": "எந்தப் பயன்பாட்டிலிருந்தும் Pastezo-வைத் திறக்கும்.",
+  "settings.hotkeyWayland": "Wayland பயன்பாடுகள் விசைகளைப் பிடிக்க அனுமதிப்பதில்லை. கணினி அமைப்புகளில் Pastezo-வைத் தொடங்கும் குறுக்குவழியைச் சேர்க்கவும்.",
+  "toast.hotkeyTaken": "இந்தக் குறுக்குவழியை வேறொரு பயன்பாடு பயன்படுத்துகிறது",
+  "toast.update": "Pastezo {version} கிடைக்கிறது",
+  "toast.download": "பதிவிறக்கு",
+  "settings.privacy": "தனியுரிமை:",
+  "settings.hideFromCapture": "திரையைப் பகிரும்போது Pastezo-வை மறை"
 }

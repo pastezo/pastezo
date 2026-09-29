@@ -63,5 +63,16 @@
   "stats.byDay": "დაკოპირებული ბოლო 7 დღეში",
   "stats.text": "ტექსტი",
   "stats.link": "ბმულები",
-  "stats.image": "სურათები"
+  "stats.image": "სურათები",
+  "settings.hotkey": "მალსახმობი:",
+  "settings.hotkeyRecord": "მალსახმობის ჩაწერა",
+  "settings.hotkeyTyping": "დააჭირეთ მალსახმობს…",
+  "settings.hotkeyClear": "გასუფთავება",
+  "settings.hotkeyHint": "ხსნის Pastezo-ს ნებისმიერი აპიდან.",
+  "settings.hotkeyWayland": "Wayland აპებს არ აძლევს კლავიშების დაჭერის საშუალებას. სისტემის პარამეტრებში დაამატეთ მალსახმობი, რომელიც Pastezo-ს გაუშვებს.",
+  "toast.hotkeyTaken": "ამ მალსახმობს სხვა აპი იყენებს",
+  "toast.update": "ხელმისაწვდომია Pastezo {version}",
+  "toast.download": "ჩამოტვირთვა",
+  "settings.privacy": "კონფიდენციალურობა:",
+  "settings.hideFromCapture": "Pastezo-ს დამალვა ეკრანის გაზიარებისას"
 }

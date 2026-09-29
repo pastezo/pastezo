@@ -63,5 +63,16 @@
   "stats.byDay": "Копирано през последните 7 дни",
   "stats.text": "Текст",
   "stats.link": "Връзки",
-  "stats.image": "Изображения"
+  "stats.image": "Изображения",
+  "settings.hotkey": "Клавишна комбинация:",
+  "settings.hotkeyRecord": "Записване на комбинация",
+  "settings.hotkeyTyping": "Натиснете комбинация…",
+  "settings.hotkeyClear": "Изчистване",
+  "settings.hotkeyHint": "Отваря Pastezo от всяко приложение.",
+  "settings.hotkeyWayland": "Wayland не позволява на приложенията да прихващат клавиши. Добавете в системните настройки комбинация, която стартира Pastezo.",
+  "toast.hotkeyTaken": "Тази комбинация се използва от друго приложение",
+  "toast.update": "Налична е Pastezo {version}",
+  "toast.download": "Изтегляне",
+  "settings.privacy": "Поверителност:",
+  "settings.hideFromCapture": "Скриване на Pastezo при споделяне на екрана"
 }

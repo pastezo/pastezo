@@ -63,5 +63,16 @@
   "stats.byDay": "Скопійовано за 7 днів",
   "stats.text": "Текст",
   "stats.link": "Посилання",
-  "stats.image": "Зображення"
+  "stats.image": "Зображення",
+  "settings.hotkey": "Сполучення клавіш:",
+  "settings.hotkeyRecord": "Записати сполучення",
+  "settings.hotkeyTyping": "Натисніть сполучення…",
+  "settings.hotkeyClear": "Очистити",
+  "settings.hotkeyHint": "Відкриває Pastezo з будь-якої програми.",
+  "settings.hotkeyWayland": "Wayland не дозволяє програмам перехоплювати клавіші. Додайте в налаштуваннях системи сполучення, яке запускає Pastezo.",
+  "toast.hotkeyTaken": "Це сполучення вже використовує інша програма",
+  "toast.update": "Доступна версія Pastezo {version}",
+  "toast.download": "Завантажити",
+  "settings.privacy": "Приватність:",
+  "settings.hideFromCapture": "Приховувати Pastezo під час демонстрації екрана"
 }

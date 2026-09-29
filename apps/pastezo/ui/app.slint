@@ -224,6 +224,17 @@ export global Env {
     in property <[Part]> sample-time;
     in property <string> launch-label;
     in property <string> launch-at-login;
+    // General → leaving the windows out of screen sharing (not offered where the OS cannot)
+    in property <bool> can-hide-from-capture;
+    in property <string> privacy-label;
+    in property <string> hide-from-capture;
+    // General → the global shortcut
+    in property <string> hotkey-label;
+    in property <string> hotkey-record;
+    in property <string> hotkey-typing;
+    in property <string> hotkey-clear;
+    in property <string> hotkey-hint;
+    in property <string> hotkey-wayland;
     in property <string> history-label;
     in property <string> clear-all;
     in property <string> clear-confirm;
@@ -735,9 +746,15 @@ export component AppWindow inherits Window {
     property <int> reveal-count;
     callback move-selection(int);
     callback copy-selected();
+    /// Return: the selected clip into the app the user came from
+    callback paste-selected();
+    /// ⌘1…⌘9 / Ctrl+1…9: the N-th clip of the list (from 1) the same way
+    callback paste-nth(int);
     callback delete-selected();
     /// ⌘Z / Ctrl+Z, or "Undo" in the toast: the last deleted clip comes back
     callback undo-delete();
+    /// the button in the toast (Undo, Download): Rust knows which it is
+    callback toast-action();
     callback preview-selected();
     /// a printable key typed outside the search field: true if it started a search
     callback type-to-search(string) -> bool;
@@ -831,6 +848,11 @@ export component AppWindow inherits Window {
                 root.toggle-search();
                 return accept;
             }
+            // ⌘1…⌘9 / Ctrl+1…9: paste the N-th clip (from the search field too)
+            if event.modifiers.control && !event.modifiers.alt && event.text.character-count == 1 && event.text.is-float() && event.text.to-float() >= 1 {
+                root.paste-nth(event.text.to-float());
+                return accept;
+            }
             if !Env.macos && event.modifiers.control && !event.modifiers.alt && (event.text == "w" || event.text == "W") {
                 root.close-window();
                 return accept;
@@ -856,8 +878,8 @@ export component AppWindow inherits Window {
             }
             if event.text == Key.UpArrow { root.move-selection(-1); return accept; }
             if event.text == Key.DownArrow { root.move-selection(1); return accept; }
-            // Return and Space: the preview (⌘C copies)
-            if event.text == Key.Return { root.preview-selected(); return accept; }
+            // Return pastes into the previous app; Space: the preview; ⌘C copies
+            if event.text == Key.Return { root.paste-selected(); return accept; }
             // ⌘C / Ctrl+C with no text selected anywhere: the selected clip
             if event.modifiers.control && (event.text == "c" || event.text == "C") { root.copy-selected(); return accept; }
             if event.text == Key.Backspace || event.text == Key.Delete { root.delete-selected(); return accept; }
@@ -922,9 +944,14 @@ export component AppWindow inherits Window {
                                     edited => { root.query-edited(self.text); }
                                     key-pressed(event) => {
                                         if event.text == Key.Escape { root.toggle-search(); return accept; }
-                                        // down to the results; Return previews the first one
+                                        // down to the results; Return pastes the selected one (none: the first)
                                         if event.text == Key.DownArrow { root.focus-list(); root.move-selection(1); return accept; }
-                                        if event.text == Key.Return { root.focus-list(); root.move-selection(1); root.preview-selected(); return accept; }
+                                        if event.text == Key.Return {
+                                            root.focus-list();
+                                            if root.selected-id < 0 { root.move-selection(1); }
+                                            root.paste-selected();
+                                            return accept;
+                                        }
                                         reject
                                     }
                                 }
@@ -1049,11 +1076,12 @@ export component AppWindow inherits Window {
     if root.preview-open: Rectangle {
         background: #00000040;
         TouchArea { clicked => { root.close-preview(); } }
-        // its own keys while open: Space / Escape close, arrows scroll
+        // its own keys while open: Space / Escape close, Return pastes, arrows scroll
         FocusScope {
             init => { self.focus(); }
             key-pressed(e) => {
-                if e.text == " " || e.text == Key.Return || e.text == Key.Escape { root.close-preview(); return accept; }
+                if e.text == Key.Return { root.paste-selected(); return accept; }
+                if e.text == " " || e.text == Key.Escape { root.close-preview(); return accept; }
                 if e.text == Key.DownArrow { preview-scroll.scroll-by(60px); return accept; }
                 if e.text == Key.UpArrow { preview-scroll.scroll-by(-60px); return accept; }
                 reject
@@ -1112,7 +1140,7 @@ export component AppWindow inherits Window {
     ToastView {
         toast: root.toast;
         limit: root.width - 32px;
-        action-clicked => { root.undo-delete(); }
+        action-clicked => { root.toast-action(); }
         x: (root.width - self.width) / 2;
         y: root.toast-shown ? 14px : 4px;
         opacity: root.toast-shown ? 1 : 0;
@@ -1821,6 +1849,16 @@ export component SettingsWindow inherits Window {
     /// General: the agent starts at login (Rust saves it and registers it)
     in-out property <bool> launch-at-login: true;
     callback launch-at-login-changed(bool);
+    /// General: screen sharing and recording do not show Pastezo (Rust saves and applies it)
+    in-out property <bool> hide-from-capture;
+    callback hide-from-capture-changed(bool);
+    /// General: the global shortcut that opens Pastezo ("⌥⌘V"; empty: none)
+    in property <string> hotkey;
+    /// waiting for the keys of a new one (Rust reads them from winit, see src/hotkey.rs)
+    in-out property <bool> hotkey-recording;
+    /// false where the OS lets no app listen to keys (Wayland)
+    in property <bool> hotkey-available: true;
+    callback hotkey-clear();
 
     /// Windows, Linux: Ctrl+W / Ctrl+M / Ctrl+Q — the same keys as ⌘W, ⌘M, ⌘Q,
     /// which on macOS go through the menus
@@ -1831,6 +1869,7 @@ export component SettingsWindow inherits Window {
     /// switching tabs removes the focused control: the shortcut catcher takes it back
     function show-tab(i: int) {
         root.tab = i;
+        root.hotkey-recording = false;
         shortcuts.focus();
     }
 
@@ -1902,6 +1941,34 @@ export component SettingsWindow inherits Window {
                         text: Env.launch-at-login;
                         checked <=> root.launch-at-login;
                         toggled(on) => { root.launch-at-login-changed(on); }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 6px;
+                    FormRow {
+                        label: Env.hotkey-label;
+                        // a click starts recording: the next shortcut pressed is the one
+                        if root.hotkey-available: Start {
+                            spacing: 8px;
+                            SettingButton {
+                                text: root.hotkey-recording ? Env.hotkey-typing : root.hotkey == "" ? Env.hotkey-record : root.hotkey;
+                                filled: root.hotkey-recording;
+                                clicked => { root.hotkey-recording = !root.hotkey-recording; }
+                            }
+                            if root.hotkey != "" && !root.hotkey-recording: SettingButton {
+                                text: Env.hotkey-clear;
+                                clicked => { root.hotkey-clear(); }
+                            }
+                        }
+                    }
+                    FormRow { FormHint { text: root.hotkey-available ? Env.hotkey-hint : Env.hotkey-wayland; } }
+                }
+                if Env.can-hide-from-capture: FormRow {
+                    label: Env.privacy-label;
+                    Checkbox {
+                        text: Env.hide-from-capture;
+                        checked <=> root.hide-from-capture;
+                        toggled(on) => { root.hide-from-capture-changed(on); }
                     }
                 }
                 FormSeparator {}

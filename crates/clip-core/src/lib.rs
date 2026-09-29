@@ -3,6 +3,7 @@
 
 mod code;
 mod history;
+pub mod hotkey;
 #[cfg(unix)]
 pub mod ipc;
 mod model;
@@ -11,6 +12,7 @@ mod search;
 mod store;
 mod watcher;
 
+pub use hotkey::{Hotkey, WindowLock};
 pub use history::{data_dir, Deleted, History, MAX_CLIP_BYTES};
 pub use model::{Clip, ClipContent, ClipKind};
 pub use search::{Search, SearchKind};

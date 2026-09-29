@@ -63,5 +63,16 @@
   "stats.byDay": "پچھلے 7 دنوں میں کاپی کیا گیا",
   "stats.text": "متن",
   "stats.link": "لنکس",
-  "stats.image": "تصاویر"
+  "stats.image": "تصاویر",
+  "settings.hotkey": "شارٹ کٹ:",
+  "settings.hotkeyRecord": "شارٹ کٹ ریکارڈ کریں",
+  "settings.hotkeyTyping": "شارٹ کٹ دبائیں…",
+  "settings.hotkeyClear": "صاف کریں",
+  "settings.hotkeyHint": "کسی بھی ایپ سے Pastezo کھولتا ہے۔",
+  "settings.hotkeyWayland": "Wayland ایپس کو کیز پکڑنے نہیں دیتا۔ سسٹم کی ترتیبات میں ایسا شارٹ کٹ شامل کریں جو Pastezo چلائے۔",
+  "toast.hotkeyTaken": "یہ شارٹ کٹ کوئی اور ایپ استعمال کر رہی ہے",
+  "toast.update": "Pastezo {version} دستیاب ہے",
+  "toast.download": "ڈاؤن لوڈ کریں",
+  "settings.privacy": "رازداری:",
+  "settings.hideFromCapture": "اسکرین شیئرنگ کے دوران Pastezo چھپائیں"
 }

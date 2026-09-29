@@ -63,5 +63,16 @@
   "stats.byDay": "Պատճենված վերջին 7 օրում",
   "stats.text": "Տեքստ",
   "stats.link": "Հղումներ",
-  "stats.image": "Պատկերներ"
+  "stats.image": "Պատկերներ",
+  "settings.hotkey": "Արագ ստեղն՝",
+  "settings.hotkeyRecord": "Ձայնագրել արագ ստեղնը",
+  "settings.hotkeyTyping": "Սեղմեք արագ ստեղնը…",
+  "settings.hotkeyClear": "Մաքրել",
+  "settings.hotkeyHint": "Բացում է Pastezo-ն ցանկացած հավելվածից։",
+  "settings.hotkeyWayland": "Wayland-ը թույլ չի տալիս հավելվածներին որսալ ստեղները։ Համակարգի կարգավորումներում ավելացրեք արագ ստեղն, որը գործարկում է Pastezo-ն։",
+  "toast.hotkeyTaken": "Այս արագ ստեղնն օգտագործում է մեկ այլ հավելված",
+  "toast.update": "Հասանելի է Pastezo {version}-ը",
+  "toast.download": "Ներբեռնել",
+  "settings.privacy": "Գաղտնիություն:",
+  "settings.hideFromCapture": "Թաքցնել Pastezo-ն էկրանը կիսելիս"
 }

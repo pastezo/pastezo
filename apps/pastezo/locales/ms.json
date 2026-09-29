@@ -63,5 +63,16 @@
   "stats.byDay": "Disalin dalam 7 hari lalu",
   "stats.text": "Teks",
   "stats.link": "Pautan",
-  "stats.image": "Imej"
+  "stats.image": "Imej",
+  "settings.hotkey": "Pintasan:",
+  "settings.hotkeyRecord": "Rakam Pintasan",
+  "settings.hotkeyTyping": "Tekan Pintasan…",
+  "settings.hotkeyClear": "Kosongkan",
+  "settings.hotkeyHint": "Membuka Pastezo dari mana-mana apl.",
+  "settings.hotkeyWayland": "Wayland tidak membenarkan apl menangkap kekunci. Dalam tetapan sistem, tambah pintasan yang memulakan Pastezo.",
+  "toast.hotkeyTaken": "Pintasan ini digunakan oleh apl lain",
+  "toast.update": "Pastezo {version} tersedia",
+  "toast.download": "Muat turun",
+  "settings.privacy": "Privasi:",
+  "settings.hideFromCapture": "Sembunyikan Pastezo semasa perkongsian skrin"
 }

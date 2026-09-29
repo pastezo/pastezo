@@ -63,5 +63,16 @@
   "stats.byDay": "Kopiert de siste 7 dagene",
   "stats.text": "Tekst",
   "stats.link": "Lenker",
-  "stats.image": "Bilder"
+  "stats.image": "Bilder",
+  "settings.hotkey": "Hurtigtast:",
+  "settings.hotkeyRecord": "Ta opp hurtigtast",
+  "settings.hotkeyTyping": "Trykk hurtigtasten …",
+  "settings.hotkeyClear": "Tøm",
+  "settings.hotkeyHint": "Åpner Pastezo fra hvilken som helst app.",
+  "settings.hotkeyWayland": "Wayland lar ikke apper fange opp taster. Legg til en hurtigtast i systeminnstillingene som starter Pastezo.",
+  "toast.hotkeyTaken": "En annen app bruker denne hurtigtasten",
+  "toast.update": "Pastezo {version} er tilgjengelig",
+  "toast.download": "Last ned",
+  "settings.privacy": "Personvern:",
+  "settings.hideFromCapture": "Skjul Pastezo ved skjermdeling"
 }

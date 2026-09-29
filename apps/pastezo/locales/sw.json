@@ -63,5 +63,16 @@
   "stats.byDay": "Zilizonakiliwa katika siku 7 zilizopita",
   "stats.text": "Maandishi",
   "stats.link": "Viungo",
-  "stats.image": "Picha"
+  "stats.image": "Picha",
+  "settings.hotkey": "Njia ya mkato:",
+  "settings.hotkeyRecord": "Rekodi njia ya mkato",
+  "settings.hotkeyTyping": "Bonyeza njia ya mkato…",
+  "settings.hotkeyClear": "Futa",
+  "settings.hotkeyHint": "Hufungua Pastezo kutoka programu yoyote.",
+  "settings.hotkeyWayland": "Wayland hairuhusu programu kunasa vitufe. Katika mipangilio ya mfumo, ongeza njia ya mkato inayoanzisha Pastezo.",
+  "toast.hotkeyTaken": "Njia hii ya mkato inatumiwa na programu nyingine",
+  "toast.update": "Pastezo {version} inapatikana",
+  "toast.download": "Pakua",
+  "settings.privacy": "Faragha:",
+  "settings.hideFromCapture": "Ficha Pastezo wakati wa kushiriki skrini"
 }

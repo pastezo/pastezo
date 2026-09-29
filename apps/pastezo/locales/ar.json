@@ -63,5 +63,16 @@
   "stats.byDay": "ما نُسخ في آخر 7 أيام",
   "stats.text": "نص",
   "stats.link": "روابط",
-  "stats.image": "صور"
+  "stats.image": "صور",
+  "settings.hotkey": "الاختصار:",
+  "settings.hotkeyRecord": "تسجيل اختصار",
+  "settings.hotkeyTyping": "اضغط الاختصار…",
+  "settings.hotkeyClear": "مسح",
+  "settings.hotkeyHint": "يفتح Pastezo من أي تطبيق.",
+  "settings.hotkeyWayland": "لا يسمح Wayland للتطبيقات بالتقاط المفاتيح. أضف في إعدادات النظام اختصارًا يشغّل Pastezo.",
+  "toast.hotkeyTaken": "هذا الاختصار يستخدمه تطبيق آخر",
+  "toast.update": "يتوفر Pastezo {version}",
+  "toast.download": "تنزيل",
+  "settings.privacy": "الخصوصية:",
+  "settings.hideFromCapture": "إخفاء Pastezo أثناء مشاركة الشاشة"
 }

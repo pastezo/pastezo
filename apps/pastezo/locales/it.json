@@ -63,5 +63,16 @@
   "stats.byDay": "Copiato negli ultimi 7 giorni",
   "stats.text": "Testo",
   "stats.link": "Link",
-  "stats.image": "Immagini"
+  "stats.image": "Immagini",
+  "settings.hotkey": "Scorciatoia:",
+  "settings.hotkeyRecord": "Registra scorciatoia",
+  "settings.hotkeyTyping": "Premi la scorciatoia…",
+  "settings.hotkeyClear": "Cancella",
+  "settings.hotkeyHint": "Apre Pastezo da qualsiasi app.",
+  "settings.hotkeyWayland": "Wayland non permette alle app di intercettare i tasti. Nelle impostazioni di sistema, aggiungi una scorciatoia che avvii Pastezo.",
+  "toast.hotkeyTaken": "Questa scorciatoia è già usata da un’altra app",
+  "toast.update": "Pastezo {version} è disponibile",
+  "toast.download": "Scarica",
+  "settings.privacy": "Privacy:",
+  "settings.hideFromCapture": "Nascondi Pastezo durante la condivisione dello schermo"
 }

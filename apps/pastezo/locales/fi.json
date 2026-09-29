@@ -63,5 +63,16 @@
   "stats.byDay": "Kopioitu viimeisten 7 päivän aikana",
   "stats.text": "Teksti",
   "stats.link": "Linkit",
-  "stats.image": "Kuvat"
+  "stats.image": "Kuvat",
+  "settings.hotkey": "Pikanäppäin:",
+  "settings.hotkeyRecord": "Tallenna pikanäppäin",
+  "settings.hotkeyTyping": "Paina pikanäppäintä…",
+  "settings.hotkeyClear": "Tyhjennä",
+  "settings.hotkeyHint": "Avaa Pastezon mistä tahansa apista.",
+  "settings.hotkeyWayland": "Wayland ei anna appien siepata näppäimiä. Lisää järjestelmäasetuksiin pikanäppäin, joka käynnistää Pastezon.",
+  "toast.hotkeyTaken": "Toinen appi käyttää jo tätä pikanäppäintä",
+  "toast.update": "Pastezo {version} on saatavilla",
+  "toast.download": "Lataa",
+  "settings.privacy": "Yksityisyys:",
+  "settings.hideFromCapture": "Piilota Pastezo näytön jakamisen aikana"
 }

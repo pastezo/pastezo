@@ -63,5 +63,16 @@
   "stats.byDay": "पिछले 7 दिनों में कॉपी किया गया",
   "stats.text": "टेक्स्ट",
   "stats.link": "लिंक",
-  "stats.image": "चित्र"
+  "stats.image": "चित्र",
+  "settings.hotkey": "शॉर्टकट:",
+  "settings.hotkeyRecord": "शॉर्टकट रिकॉर्ड करें",
+  "settings.hotkeyTyping": "शॉर्टकट दबाएँ…",
+  "settings.hotkeyClear": "साफ़ करें",
+  "settings.hotkeyHint": "किसी भी ऐप से Pastezo खोलता है।",
+  "settings.hotkeyWayland": "Wayland ऐप्स को कुंजियाँ पकड़ने नहीं देता। सिस्टम सेटिंग्स में ऐसा शॉर्टकट जोड़ें जो Pastezo शुरू करे।",
+  "toast.hotkeyTaken": "यह शॉर्टकट कोई दूसरा ऐप इस्तेमाल कर रहा है",
+  "toast.update": "Pastezo {version} उपलब्ध है",
+  "toast.download": "डाउनलोड करें",
+  "settings.privacy": "गोपनीयता:",
+  "settings.hideFromCapture": "स्क्रीन शेयर करते समय Pastezo छिपाएँ"
 }

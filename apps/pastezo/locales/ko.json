@@ -63,5 +63,16 @@
   "stats.byDay": "최근 7일간 복사",
   "stats.text": "텍스트",
   "stats.link": "링크",
-  "stats.image": "이미지"
+  "stats.image": "이미지",
+  "settings.hotkey": "단축키:",
+  "settings.hotkeyRecord": "단축키 기록",
+  "settings.hotkeyTyping": "단축키 입력…",
+  "settings.hotkeyClear": "지우기",
+  "settings.hotkeyHint": "어떤 앱에서든 Pastezo를 엽니다.",
+  "settings.hotkeyWayland": "Wayland에서는 앱이 키를 가로챌 수 없습니다. 시스템 설정에서 Pastezo를 실행하는 단축키를 추가하세요.",
+  "toast.hotkeyTaken": "다른 앱이 이 단축키를 사용 중입니다",
+  "toast.update": "Pastezo {version} 사용 가능",
+  "toast.download": "다운로드",
+  "settings.privacy": "개인정보:",
+  "settings.hideFromCapture": "화면 공유 중 Pastezo 숨기기"
 }

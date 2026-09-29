@@ -63,5 +63,16 @@
   "stats.byDay": "Son 7 günde kopyalananlar",
   "stats.text": "Metin",
   "stats.link": "Bağlantılar",
-  "stats.image": "Görseller"
+  "stats.image": "Görseller",
+  "settings.hotkey": "Kısayol:",
+  "settings.hotkeyRecord": "Kısayolu Kaydet",
+  "settings.hotkeyTyping": "Kısayola Basın…",
+  "settings.hotkeyClear": "Temizle",
+  "settings.hotkeyHint": "Pastezo’yu herhangi bir uygulamadan açar.",
+  "settings.hotkeyWayland": "Wayland, uygulamaların tuşları yakalamasına izin vermez. Sistem ayarlarında Pastezo’yu başlatan bir kısayol ekleyin.",
+  "toast.hotkeyTaken": "Bu kısayolu başka bir uygulama kullanıyor",
+  "toast.update": "Pastezo {version} kullanılabilir",
+  "toast.download": "İndir",
+  "settings.privacy": "Gizlilik:",
+  "settings.hideFromCapture": "Ekran paylaşımı sırasında Pastezo’yu gizle"
 }

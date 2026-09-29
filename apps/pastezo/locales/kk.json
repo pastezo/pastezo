@@ -63,5 +63,16 @@
   "stats.byDay": "Соңғы 7 күнде көшірілгендер",
   "stats.text": "Мәтін",
   "stats.link": "Сілтемелер",
-  "stats.image": "Суреттер"
+  "stats.image": "Суреттер",
+  "settings.hotkey": "Пернелер тіркесімі:",
+  "settings.hotkeyRecord": "Тіркесімді жазу",
+  "settings.hotkeyTyping": "Тіркесімді басыңыз…",
+  "settings.hotkeyClear": "Тазалау",
+  "settings.hotkeyHint": "Pastezo-ны кез келген қолданбадан ашады.",
+  "settings.hotkeyWayland": "Wayland қолданбаларға пернелерді ұстауға рұқсат бермейді. Жүйе баптауларында Pastezo-ны іске қосатын тіркесім қосыңыз.",
+  "toast.hotkeyTaken": "Бұл тіркесімді басқа қолданба пайдаланып жатыр",
+  "toast.update": "Pastezo {version} қолжетімді",
+  "toast.download": "Жүктеп алу",
+  "settings.privacy": "Құпиялық:",
+  "settings.hideFromCapture": "Экранды көрсету кезінде Pastezo-ны жасыру"
 }

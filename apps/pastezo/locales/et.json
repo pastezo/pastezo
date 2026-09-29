@@ -63,5 +63,16 @@
   "stats.byDay": "Kopeeritud viimase 7 päeva jooksul",
   "stats.text": "Tekst",
   "stats.link": "Lingid",
-  "stats.image": "Pildid"
+  "stats.image": "Pildid",
+  "settings.hotkey": "Kiirklahv:",
+  "settings.hotkeyRecord": "Salvesta kiirklahv",
+  "settings.hotkeyTyping": "Vajuta kiirklahvi…",
+  "settings.hotkeyClear": "Tühjenda",
+  "settings.hotkeyHint": "Avab Pastezo mis tahes rakendusest.",
+  "settings.hotkeyWayland": "Wayland ei lase rakendustel klahve püüda. Lisa süsteemiseadetes kiirklahv, mis käivitab Pastezo.",
+  "toast.hotkeyTaken": "Seda kiirklahvi kasutab teine rakendus",
+  "toast.update": "Pastezo {version} on saadaval",
+  "toast.download": "Laadi alla",
+  "settings.privacy": "Privaatsus:",
+  "settings.hideFromCapture": "Peida Pastezo ekraani jagamisel"
 }

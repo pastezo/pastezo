@@ -63,5 +63,16 @@
   "stats.byDay": "最近 7 天的複製",
   "stats.text": "文字",
   "stats.link": "連結",
-  "stats.image": "圖片"
+  "stats.image": "圖片",
+  "settings.hotkey": "快速鍵：",
+  "settings.hotkeyRecord": "錄製快速鍵",
+  "settings.hotkeyTyping": "按下快速鍵⋯",
+  "settings.hotkeyClear": "清除",
+  "settings.hotkeyHint": "從任何 App 開啟 Pastezo。",
+  "settings.hotkeyWayland": "Wayland 不允許 App 擷取按鍵。請在系統設定中加入一個啟動 Pastezo 的快速鍵。",
+  "toast.hotkeyTaken": "此快速鍵已被其他 App 使用",
+  "toast.update": "Pastezo {version} 現已推出",
+  "toast.download": "下載",
+  "settings.privacy": "隱私：",
+  "settings.hideFromCapture": "螢幕分享時隱藏 Pastezo"
 }

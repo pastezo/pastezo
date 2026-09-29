@@ -63,5 +63,16 @@
   "stats.byDay": "Nokopēts pēdējās 7 dienās",
   "stats.text": "Teksts",
   "stats.link": "Saites",
-  "stats.image": "Attēli"
+  "stats.image": "Attēli",
+  "settings.hotkey": "Īsinājumtaustiņš:",
+  "settings.hotkeyRecord": "Ierakstīt īsinājumtaustiņu",
+  "settings.hotkeyTyping": "Nospiediet īsinājumtaustiņu…",
+  "settings.hotkeyClear": "Notīrīt",
+  "settings.hotkeyHint": "Atver Pastezo no jebkuras lietotnes.",
+  "settings.hotkeyWayland": "Wayland neļauj lietotnēm uztvert taustiņus. Sistēmas iestatījumos pievienojiet īsinājumtaustiņu, kas palaiž Pastezo.",
+  "toast.hotkeyTaken": "Šo īsinājumtaustiņu izmanto cita lietotne",
+  "toast.update": "Pieejama Pastezo {version}",
+  "toast.download": "Lejupielādēt",
+  "settings.privacy": "Privātums:",
+  "settings.hideFromCapture": "Paslēpt Pastezo ekrāna kopīgošanas laikā"
 }

@@ -63,5 +63,16 @@
   "stats.byDay": "Kopieret de seneste 7 dage",
   "stats.text": "Tekst",
   "stats.link": "Links",
-  "stats.image": "Billeder"
+  "stats.image": "Billeder",
+  "settings.hotkey": "Genvej:",
+  "settings.hotkeyRecord": "Optag genvej",
+  "settings.hotkeyTyping": "Tryk på genvej…",
+  "settings.hotkeyClear": "Ryd",
+  "settings.hotkeyHint": "Åbner Pastezo fra enhver app.",
+  "settings.hotkeyWayland": "Wayland lader ikke apps fange taster. Tilføj i systemindstillingerne en genvej, der starter Pastezo.",
+  "toast.hotkeyTaken": "Denne genvej bruges af en anden app",
+  "toast.update": "Pastezo {version} er tilgængelig",
+  "toast.download": "Hent",
+  "settings.privacy": "Privatliv:",
+  "settings.hideFromCapture": "Skjul Pastezo ved skærmdeling"
 }

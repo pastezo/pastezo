@@ -63,5 +63,16 @@
   "stats.byDay": "Kopierat de senaste 7 dagarna",
   "stats.text": "Text",
   "stats.link": "Länkar",
-  "stats.image": "Bilder"
+  "stats.image": "Bilder",
+  "settings.hotkey": "Kortkommando:",
+  "settings.hotkeyRecord": "Spela in kortkommando",
+  "settings.hotkeyTyping": "Tryck på kortkommando …",
+  "settings.hotkeyClear": "Rensa",
+  "settings.hotkeyHint": "Öppnar Pastezo från vilken app som helst.",
+  "settings.hotkeyWayland": "Wayland låter inte appar fånga tangenter. Lägg till ett kortkommando i systeminställningarna som startar Pastezo.",
+  "toast.hotkeyTaken": "Det här kortkommandot används av en annan app",
+  "toast.update": "Pastezo {version} finns tillgänglig",
+  "toast.download": "Hämta",
+  "settings.privacy": "Integritet:",
+  "settings.hideFromCapture": "Dölj Pastezo vid skärmdelning"
 }

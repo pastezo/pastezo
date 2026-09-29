@@ -78,7 +78,9 @@ On Linux, unpack the archive and run `./install.sh` — it installs Pastezo into
 | Copy the selected clip | ⌘C | Ctrl+C |
 | Bring back a deleted clip | ⌘Z | Ctrl+Z |
 | Select a clip | ↑ ↓ | ↑ ↓ |
-| Preview | Return, Space | Return, Space |
+| Paste the selected clip into the previous app | Return | Return |
+| Paste one of the first nine clips | ⌘1…⌘9 | Ctrl+1…9 |
+| Preview | Space | Space |
 | Delete | ⌫ | Delete |
 
 ## Build from source

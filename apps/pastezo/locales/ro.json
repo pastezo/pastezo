@@ -63,5 +63,16 @@
   "stats.byDay": "Copiat în ultimele 7 zile",
   "stats.text": "Text",
   "stats.link": "Linkuri",
-  "stats.image": "Imagini"
+  "stats.image": "Imagini",
+  "settings.hotkey": "Scurtătură:",
+  "settings.hotkeyRecord": "Înregistrează scurtătura",
+  "settings.hotkeyTyping": "Apăsați scurtătura…",
+  "settings.hotkeyClear": "Șterge",
+  "settings.hotkeyHint": "Deschide Pastezo din orice aplicație.",
+  "settings.hotkeyWayland": "Wayland nu lasă aplicațiile să capteze taste. În setările sistemului, adăugați o scurtătură care pornește Pastezo.",
+  "toast.hotkeyTaken": "Această scurtătură este folosită de altă aplicație",
+  "toast.update": "Pastezo {version} este disponibil",
+  "toast.download": "Descarcă",
+  "settings.privacy": "Confidențialitate:",
+  "settings.hideFromCapture": "Ascunde Pastezo în timpul partajării ecranului"
 }

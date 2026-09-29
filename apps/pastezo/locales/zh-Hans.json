@@ -63,5 +63,16 @@
   "stats.byDay": "最近 7 天的复制",
   "stats.text": "文本",
   "stats.link": "链接",
-  "stats.image": "图片"
+  "stats.image": "图片",
+  "settings.hotkey": "快捷键：",
+  "settings.hotkeyRecord": "录制快捷键",
+  "settings.hotkeyTyping": "按下快捷键…",
+  "settings.hotkeyClear": "清除",
+  "settings.hotkeyHint": "从任何应用打开 Pastezo。",
+  "settings.hotkeyWayland": "Wayland 不允许应用捕获按键。请在系统设置中添加一个启动 Pastezo 的快捷键。",
+  "toast.hotkeyTaken": "此快捷键已被其他应用占用",
+  "toast.update": "Pastezo {version} 现已推出",
+  "toast.download": "下载",
+  "settings.privacy": "隐私：",
+  "settings.hideFromCapture": "屏幕共享时隐藏 Pastezo"
 }
