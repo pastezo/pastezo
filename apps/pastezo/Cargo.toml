@@ -41,7 +41,7 @@ x11rb = { version = "0.13", features = ["allow-unsafe-code", "dl-libxcb"] }
 x11-dl = "2.21"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.60", features = ["Win32_Globalization", "Win32_System_Registry"] }
+windows-sys = { version = "0.60", features = ["Win32_Globalization", "Win32_Networking_WinHttp", "Win32_System_Registry"] }
 # dragging an image out of the window (shell data object + SHDoDragDrop)
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
 
@@ -51,5 +51,5 @@ tempfile = "3"
 
 [build-dependencies]
 slint-build = "1.18"
-# Windows: the .exe icon (pastezo.rc); does nothing on other targets
+# Windows: the .exe icon and version details (build.rs); does nothing on other targets
 embed-resource = "3"

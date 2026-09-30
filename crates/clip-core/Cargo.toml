@@ -4,7 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-blake3 = "1"
 dirs = "7"
 # decoders only where the OS clipboard needs them (see the target sections)
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
@@ -12,6 +11,8 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 thiserror = "2"
 url = "2"
 uuid = { version = "1", features = ["v4"] }
+# content hash (repeats, image file names): fast, not cryptographic
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

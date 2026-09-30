@@ -1864,7 +1864,7 @@ export component SettingsWindow inherits Window {
     in property <Toast> toast;
     in property <bool> toast-shown;
     /// General: the agent starts at login (Rust saves it and registers it)
-    in-out property <bool> launch-at-login: true;
+    in-out property <bool> launch-at-login: false;
     callback launch-at-login-changed(bool);
     /// General: screen sharing and recording do not show Pastezo (Rust saves and applies it)
     in-out property <bool> hide-from-capture;

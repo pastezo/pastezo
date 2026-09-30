@@ -110,7 +110,7 @@ impl Default for TextStyle {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { theme: themes::LIGHT, icon: app_icon::DEFAULT, text: TextStyle::default(), launch_at_login: true, hide_from_capture: false, window: None, update_checked: None }
+        Settings { theme: themes::LIGHT, icon: app_icon::DEFAULT, text: TextStyle::default(), launch_at_login: false, hide_from_capture: false, window: None, update_checked: None }
     }
 }
 
@@ -135,8 +135,8 @@ impl Settings {
             gap: num("gap", d.gap),
         }
         .fitted();
-        // on unless turned off (settings from before the switch worked have none)
-        let launch_at_login = json.get("launchAtLogin").and_then(|v| v.as_bool()).unwrap_or(true);
+        // off unless turned on: the app does not add itself to the login items unasked
+        let launch_at_login = json.get("launchAtLogin").and_then(|v| v.as_bool()).unwrap_or(false);
         let hide_from_capture = json.get("hideFromCapture").and_then(|v| v.as_bool()).unwrap_or(false);
         let window = json.get("window").and_then(|w| {
             let num = |k: &str| w.get(k).and_then(|v| v.as_f64()).filter(|v| v.is_finite());
@@ -191,7 +191,7 @@ mod tests {
         assert_eq!(Settings::load(dir.path()), Settings::default());
         let text = TextStyle { font: "Helvetica".into(), size: 20.0, line: 1.65, gap: 14.0 };
         let window = Some(WindowFrame { width: 1000.0, height: 800.0, position: Some((-1200, 40, 2.0)), maximized: false });
-        let s = Settings { theme: "nightshade", icon: "sky", text, launch_at_login: false, hide_from_capture: true, window, update_checked: Some(1_790_000_000_000) };
+        let s = Settings { theme: "nightshade", icon: "sky", text, launch_at_login: true, hide_from_capture: true, window, update_checked: Some(1_790_000_000_000) };
         s.save(dir.path()).unwrap();
         assert_eq!(Settings::load(dir.path()), s);
         // a theme that no longer exists: back to the default

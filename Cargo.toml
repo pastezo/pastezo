@@ -30,7 +30,7 @@ zune-jpeg = { opt-level = 3 }
 tiff = { opt-level = 3 }
 weezl = { opt-level = 3 }
 # content hash and the database
-blake3 = { opt-level = 3 }
+xxhash-rust = { opt-level = 3 }
 libsqlite3-sys = { opt-level = 3 }
 # drawing the window (software renderer): every frame of a scroll
 i-slint-renderer-software = { opt-level = 3 }

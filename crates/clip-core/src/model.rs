@@ -85,19 +85,18 @@ impl ClipContent {
         }
     }
 
+    /// 128-bit XXH3 of the content, 32 hex digits. Not cryptographic: it
+    /// finds repeats and names image files. Changing it needs a migration
+    /// (`store.rs` v7 moved the history over from BLAKE3).
     pub fn hash(&self) -> String {
-        let mut h = blake3::Hasher::new();
-        match self {
-            ClipContent::Text(s) => {
-                h.update(b"t");
-                h.update(s.as_bytes());
-            }
-            ClipContent::Image(b) => {
-                h.update(b"i");
-                h.update(b);
-            }
-        }
-        h.finalize().to_hex().to_string()
+        let (tag, bytes) = match self {
+            ClipContent::Text(s) => (b't', s.as_bytes()),
+            ClipContent::Image(b) => (b'i', b.as_slice()),
+        };
+        let mut h = xxhash_rust::xxh3::Xxh3::new();
+        h.update(&[tag]);
+        h.update(bytes);
+        format!("{:032x}", h.digest128())
     }
 }
 
