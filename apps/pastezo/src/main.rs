@@ -557,7 +557,11 @@ where
     env.set_font_size_label(i18n.t("settings.fontSize", &[]).into());
     env.set_line_height_label(i18n.t("settings.lineHeight", &[]).into());
     env.set_clip_spacing_label(i18n.t("settings.clipSpacing", &[]).into());
-    env.set_defaults(i18n.t("settings.defaults", &[]).into());
+    env.set_reset_font(i18n.t("settings.resetFont", &[]).into());
+    env.set_preset_label(i18n.t("settings.preset", &[]).into());
+    env.set_preset_compact(i18n.t("settings.presetCompact", &[]).into());
+    env.set_preset_default(i18n.t("settings.presetDefault", &[]).into());
+    env.set_preset_large(i18n.t("settings.presetLarge", &[]).into());
     env.on_format_points({
         let i18n = i18n.clone();
         move |v| i18n.t("settings.points", &[("value", &i18n.decimal(v))]).into()
@@ -598,6 +602,12 @@ where
     env.set_hotkey_hint(i18n.t("settings.hotkeyHint", &[]).into());
     env.set_hotkey_wayland(i18n.t("settings.hotkeyWayland", &[]).into());
     env.set_history_label(i18n.t("settings.history", &[]).into());
+    env.set_keep_label(i18n.t("settings.keep", &[]).into());
+    env.set_keep_week(i18n.t("settings.keepWeek", &[]).into());
+    env.set_keep_month(i18n.t("settings.keepMonth", &[]).into());
+    env.set_keep_year(i18n.t("settings.keepYear", &[]).into());
+    env.set_keep_forever(i18n.t("settings.keepForever", &[]).into());
+    env.set_keep_hint(i18n.t("settings.keepHint", &[]).into());
     env.set_clear_all(i18n.t("settings.clearAll", &[]).into());
     env.set_clear_confirm(i18n.t("settings.clearConfirm", &[]).into());
     env.set_clear_warning(i18n.t("settings.clearWarning", &[]).into());
@@ -662,6 +672,7 @@ fn show_text_style(w: &SettingsWindow, t: &TextStyle) {
     w.set_text_size(t.size);
     w.set_text_line(t.line);
     w.set_text_gap(t.gap);
+    w.set_text_preset(t.preset().into());
 }
 
 /// Installed font families for the font list: the bundled MiSans first, then
@@ -772,6 +783,14 @@ impl App {
                 });
             }
         });
+        w.on_text_preset_chosen({
+            let app = Rc::downgrade(self);
+            move |id| {
+                if let Some(app) = app.upgrade() {
+                    app.set_text_style(app.settings().text.with_preset(&id));
+                }
+            }
+        });
         w.on_text_style_reset({
             let app = Rc::downgrade(self);
             move || {
@@ -823,6 +842,16 @@ impl App {
                 if let Some(app) = app.upgrade() {
                     app.import_history();
                 }
+            }
+        });
+        w.set_keep_days(self.history.keep_days().map_or(0, |d| d as i32));
+        w.on_keep_days_chosen({
+            let app = Rc::downgrade(self);
+            let w = w.as_weak();
+            move |days| {
+                let (Some(app), Some(w)) = (app.upgrade(), w.upgrade()) else { return };
+                app.set_keep_days(u32::try_from(days).ok().filter(|&d| d > 0));
+                w.set_keep_days(app.history.keep_days().map_or(0, |d| d as i32));
             }
         });
         w.on_clear_history({
@@ -995,6 +1024,24 @@ impl App {
             }
         });
         *self.job.borrow_mut() = Some(timer);
+    }
+
+    /// Settings → General → Keep clips: saved for the agent, and the clips
+    /// already too old go now.
+    fn set_keep_days(&self, days: Option<u32>) {
+        if let Err(e) = self.history.set_keep_days(days) {
+            return eprintln!("pastezo: {e}");
+        }
+        self.forget_old();
+    }
+
+    /// Deletes the clips older than Settings → General → Keep clips.
+    fn forget_old(&self) {
+        match self.history.forget_old(chrono::Utc::now().timestamp_millis()) {
+            Ok(0) => {}
+            Ok(_) => self.reload(),
+            Err(e) => eprintln!("pastezo: {e}"),
+        }
     }
 
     fn clear_history(&self) {
@@ -1230,6 +1277,8 @@ fn wire(
         data_version: Cell::new(0),
         timers: RefCell::new(Vec::new()),
     });
+    // the agent deletes them too, but may not have run since they got too old
+    app.forget_old();
     app.reload();
 
     let scale = ui.window().scale_factor();
@@ -1825,7 +1874,7 @@ mod tests {
     }
 
     /// Settings → Typography: the sliders restyle the list (kept within their
-    /// ranges and steps), "Defaults" brings the design back.
+    /// ranges and steps), "Reset font" brings the design back.
     #[test]
     fn typography_restyles_the_list() {
         testing::init_no_event_loop();
@@ -1849,7 +1898,12 @@ mod tests {
         assert_eq!(w.get_text_line(), 1.65, "the window shows the kept value");
         assert_eq!(app.settings().text.font, "Georgia");
 
-        testing::ElementHandle::find_by_accessible_label(&w, "Defaults").next().unwrap().invoke_accessible_default_action();
+        assert_eq!(w.get_text_preset(), "");
+        w.invoke_text_preset_chosen("compact".into());
+        assert_eq!(app.settings().text, TextStyle { font: "Georgia".into(), size: 14.0, line: 1.35, gap: 14.0 }, "the font stays");
+        assert_eq!((w.get_text_size(), w.get_text_preset().as_str()), (14.0, "compact"));
+
+        testing::ElementHandle::find_by_accessible_label(&w, "Reset font").next().unwrap().invoke_accessible_default_action();
         assert_eq!(app.settings().text, TextStyle::default());
         assert_eq!(ClipText::get(&ui).get_size(), 17.0);
     }
@@ -2143,10 +2197,11 @@ mod tests {
         key(" ".into());
         assert_eq!(launch.accessible_checked(), Some(false));
 
-        // Typography: "Aa", then the font size slider
+        // Typography: "Aa", the three presets, then the font size slider
         w.set_tab(1);
-        key(Key::Tab.into());
-        key(Key::Tab.into());
+        for _ in 0..5 {
+            key(Key::Tab.into());
+        }
         key(Key::RightArrow.into());
         assert_eq!(ClipText::get(&ui).get_size(), 18.0);
         key(Key::LeftArrow.into());
@@ -2206,6 +2261,40 @@ mod tests {
         assert!(!w.get_confirming_clear());
         assert!(previews(&ui).is_empty());
         assert!(history.list(0, 10).unwrap().is_empty());
+    }
+
+    /// Settings → General → Keep clips: the choice is saved for the agent and
+    /// the clips already too old leave the list at once; pinned ones stay.
+    #[test]
+    fn keeping_clips_for_a_while() {
+        testing::init_no_event_loop();
+        let dir = tempfile::tempdir().unwrap();
+        let history = Arc::new(History::open(dir.path()).unwrap());
+        let day = 24 * 60 * 60 * 1000;
+        let now = chrono::Utc::now().timestamp_millis();
+        history.import(&ClipContent::Text("old".into()), None, now - 10 * day, false).unwrap();
+        history.import(&ClipContent::Text("old pinned".into()), None, now - 10 * day, true).unwrap();
+        history.add(&ClipContent::Text("new".into()), None).unwrap();
+        let ui = AppWindow::new().unwrap();
+        let app = wire(&ui, history.clone(), I18n::new(&sys()), "macos", Arc::new(FakeClipboard::default()), Box::new(|_| {}), None);
+        app.open_settings();
+        let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
+        let press = |label: &str| {
+            testing::ElementHandle::find_by_accessible_label(&w, label).next().unwrap().invoke_accessible_default_action()
+        };
+        assert_eq!(w.get_keep_days(), 0, "for ever by default");
+        assert_eq!(previews(&ui).len(), 3);
+
+        press("A month");
+        assert_eq!((history.keep_days(), w.get_keep_days()), (Some(30), 30));
+        assert_eq!(previews(&ui).len(), 3);
+
+        press("A week");
+        assert_eq!(history.keep_days(), Some(7));
+        assert_eq!(previews(&ui), ["old pinned", "new"]);
+
+        press("Forever");
+        assert_eq!((history.keep_days(), w.get_keep_days()), (None, 0));
     }
 
     /// Settings → Import & Export: the history goes to a file and comes back

@@ -419,6 +419,20 @@ impl Store {
         Ok(clip)
     }
 
+    /// Deletes the clips copied before `before_ms`, pinned ones aside, and
+    /// returns them, so the caller can remove their files.
+    pub fn delete_before(&mut self, before_ms: i64) -> Result<Vec<Clip>> {
+        let tx = self.conn.transaction()?;
+        let clips = {
+            let mut stmt = tx.prepare(&format!("SELECT {COLUMNS} FROM clips WHERE pinned = 0 AND created_at < ?1"))?;
+            let rows = stmt.query_map([before_ms], from_row)?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        tx.execute("DELETE FROM clips WHERE pinned = 0 AND created_at < ?1", [before_ms])?;
+        tx.commit()?;
+        Ok(clips)
+    }
+
     /// Counts one copy of `kind` now (Settings → Statistics).
     pub fn count_copy(&self, kind: CopyKind) -> Result<()> {
         self.conn

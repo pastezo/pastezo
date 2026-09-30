@@ -7,6 +7,7 @@
 
 use std::fs::{self, File};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use clip_core::platform::hotkeys::Hotkeys;
 use clip_core::platform::{release_free_memory, run_main_loop, SystemClipboard};
@@ -70,7 +71,19 @@ fn main() {
     #[cfg(not(unix))]
     let _hotkeys = hotkeys;
 
+    // Settings → General → Keep clips: old clips go at start, every hour,
+    // and before each copy (a copy of an old clip then comes back as new)
+    forget_old(&history);
+    std::thread::spawn({
+        let history = history.clone();
+        move || loop {
+            std::thread::sleep(Duration::from_secs(60 * 60));
+            forget_old(&history);
+        }
+    });
+
     watcher.spawn(move |content, source_app| {
+        forget_old(&history);
         if let Err(e) = history.add(&content, source_app.as_deref()) {
             eprintln!("pastezo-agent: failed to save a clip: {e}");
         }
@@ -82,4 +95,11 @@ fn main() {
 
     let _lock = lock; // held for the life of the process
     run_main_loop();
+}
+
+fn forget_old(history: &History) {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64);
+    if let Err(e) = history.forget_old(now) {
+        eprintln!("pastezo-agent: failed to forget old clips: {e}");
+    }
 }

@@ -37,7 +37,11 @@
 | `settings.typography` | вкладка настроек (подпись под иконкой) | одно слово |
 | `settings.textFont`, `settings.fontSize`, `settings.lineHeight`, `settings.clipSpacing` | подписи строк вкладки «Типографика» | с двоеточием по правилам языка |
 | `settings.points` / `settings.em` | значение справа от ползунка | `{value}` — число (уже с десятичным разделителем языка); единица — как пишут в системных настройках |
-| `settings.defaults` | кнопка сброса вкладки «Типографика» | |
+| `settings.resetFont` | кнопка «Типографики»: вернуть шрифт и ползунки как было | глагол-действие, коротко |
+| `settings.preset`, `settings.presetCompact` / `settings.presetDefault` / `settings.presetLarge` | «Типографика»: подпись строки и три кнопки готовых размеров текста и отступов | подпись с двоеточием; кнопки — коротко, одно слово |
+| `settings.keep` | «Общие»: подпись строки «сколько хранить записи» | с двоеточием по правилам языка |
+| `settings.keepWeek` / `settings.keepMonth` / `settings.keepYear` / `settings.keepForever` | кнопки после `settings.keep`: неделю, месяц, год, всегда | коротко, продолжают подпись («Хранить записи: Неделю») |
+| `settings.keepHint` | пояснение под ними | старые записи удаляются сами, закреплённые — нет |
 | `settings.clearAll` | кнопка: удалить всю историю | глагол-действие, коротко |
 | `settings.clearConfirm` | вопрос вместо подписи после нажатия «Очистить всё»; рядом кнопки `settings.cancel` и `clip.delete` | вопрос, коротко |
 | `settings.clearWarning` | пояснение в окне подтверждения очистки (под вопросом `settings.clearConfirm`) | одно короткое предложение |

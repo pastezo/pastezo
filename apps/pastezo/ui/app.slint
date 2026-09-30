@@ -212,7 +212,11 @@ export global Env {
     in property <string> font-size-label;
     in property <string> line-height-label;
     in property <string> clip-spacing-label;
-    in property <string> defaults;
+    in property <string> reset-font;
+    in property <string> preset-label;
+    in property <string> preset-compact;
+    in property <string> preset-default;
+    in property <string> preset-large;
     /// slider values as the user's language writes them: "17 пт", "1,45 em"
     pure callback format-points(float) -> string;
     pure callback format-em(float) -> string;
@@ -236,6 +240,13 @@ export global Env {
     in property <string> hotkey-hint;
     in property <string> hotkey-wayland;
     in property <string> history-label;
+    // General → Keep clips: for a week, a month, a year, for ever
+    in property <string> keep-label;
+    in property <string> keep-week;
+    in property <string> keep-month;
+    in property <string> keep-year;
+    in property <string> keep-forever;
+    in property <string> keep-hint;
     in property <string> clear-all;
     in property <string> clear-confirm;
     in property <string> clear-warning;
@@ -1814,6 +1825,9 @@ export component SettingsWindow inherits Window {
     in property <[float]> gap-range: [8, 40, 2];
     callback text-style-edited();
     callback text-style-reset();
+    /// "compact", "default" or "large" when the sliders are on one (src/settings.rs PRESETS)
+    in property <string> text-preset;
+    callback text-preset-chosen(string);
     /// installed font families, filled when the list is first opened
     in property <[string]> fonts;
     callback fonts-wanted();
@@ -1824,6 +1838,9 @@ export component SettingsWindow inherits Window {
     callback clear-history();
     /// "Clear all" pressed once: asking to confirm
     in-out property <bool> confirming-clear;
+    /// General: how many days clips stay, 0 for ever (Rust saves it; the agent deletes older ones)
+    in property <int> keep-days;
+    callback keep-days-chosen(int);
     // Statistics (filled by src/stats.rs): numbers already formatted
     in property <string> stats-total;
     /// "copies in total" (plural of the total)
@@ -1972,6 +1989,22 @@ export component SettingsWindow inherits Window {
                     }
                 }
                 FormSeparator {}
+                VerticalLayout {
+                    spacing: 6px;
+                    FormRow {
+                        label: Env.keep-label;
+                        Start {
+                            spacing: 8px;
+                            // the shortest first: on the left, on the right right-to-left
+                            for days in (Env.rtl ? [0, 365, 30, 7] : [7, 30, 365, 0]): SettingButton {
+                                text: days == 7 ? Env.keep-week : days == 30 ? Env.keep-month : days == 365 ? Env.keep-year : Env.keep-forever;
+                                filled: root.keep-days == days;
+                                clicked => { root.keep-days-chosen(days); }
+                            }
+                        }
+                    }
+                    FormRow { FormHint { text: Env.keep-hint; } }
+                }
                 FormRow {
                     label: Env.history-label;
                     // deleting everything asks once more, in an alert over the window
@@ -2031,6 +2064,18 @@ export component SettingsWindow inherits Window {
                         if Env.rtl: FontButton { font: root.text-font; label: Env.text-font-label; clicked => { root.fonts-wanted(); font-list.show(); } }
                     }
                 }
+                FormRow {
+                    label: Env.preset-label;
+                    // compact first: on the left, on the right right-to-left
+                    Start {
+                        spacing: 8px;
+                        if !Env.rtl: SettingButton { text: Env.preset-compact; filled: root.text-preset == "compact"; clicked => { root.text-preset-chosen("compact"); } }
+                        if Env.rtl: SettingButton { text: Env.preset-large; filled: root.text-preset == "large"; clicked => { root.text-preset-chosen("large"); } }
+                        SettingButton { text: Env.preset-default; filled: root.text-preset == "default"; clicked => { root.text-preset-chosen("default"); } }
+                        if !Env.rtl: SettingButton { text: Env.preset-large; filled: root.text-preset == "large"; clicked => { root.text-preset-chosen("large"); } }
+                        if Env.rtl: SettingButton { text: Env.preset-compact; filled: root.text-preset == "compact"; clicked => { root.text-preset-chosen("compact"); } }
+                    }
+                }
                 FormSeparator {}
                 FormRow {
                     label: Env.font-size-label;
@@ -2079,7 +2124,7 @@ export component SettingsWindow inherits Window {
                 HorizontalLayout {
                     padding-top: 10px;
                     alignment: center;
-                    SettingButton { text: Env.defaults; clicked => { root.text-style-reset(); } }
+                    SettingButton { text: Env.reset-font; clicked => { root.text-style-reset(); } }
                 }
             }
 
