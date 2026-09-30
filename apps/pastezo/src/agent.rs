@@ -33,10 +33,15 @@ pub fn ensure_running() {
     }
 }
 
-/// Development builds (cargo `target/` folder) are never registered to start
-/// at login — only an installed app is.
+/// Development builds (cargo `target/` folder) and a copy run from the temp
+/// folder (opened straight from the zip, a sandbox) are never registered to
+/// start at login — only an installed app is.
 fn is_installed(path: &std::path::Path) -> bool {
-    !path.components().any(|c| c.as_os_str() == "target")
+    let temp = std::env::temp_dir();
+    // resolved too: links, `/private/var` on macOS, short names (`BRUNO~1`) on Windows
+    let real = |p: &std::path::Path| std::fs::canonicalize(p).ok();
+    let in_temp = path.starts_with(&temp) || matches!((real(path), real(&temp)), (Some(p), Some(t)) if p.starts_with(&t));
+    !path.components().any(|c| c.as_os_str() == "target") && !in_temp
 }
 
 /// Settings → General → "Open Pastezo at login": the agent starts at login
@@ -214,5 +219,15 @@ mod tests {
     fn dev_builds_are_not_registered() {
         assert!(!super::is_installed(std::path::Path::new("/Users/me/pastezo/target/release/pastezo-agent")));
         assert!(super::is_installed(std::path::Path::new("/Applications/Pastezo.app/Contents/Helpers/pastezo-agent")));
+    }
+
+    #[test]
+    fn copies_in_the_temp_folder_are_not_registered() {
+        let dir = tempfile::tempdir().unwrap();
+        let agent = dir.path().join("Pastezo").join("pastezo-agent");
+        assert!(!super::is_installed(&agent), "not there yet");
+        std::fs::create_dir_all(agent.parent().unwrap()).unwrap();
+        std::fs::write(&agent, "").unwrap();
+        assert!(!super::is_installed(&agent));
     }
 }

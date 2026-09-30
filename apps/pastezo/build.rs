@@ -1,11 +1,18 @@
 use std::fmt::Write;
 
+include!("version_rc.rs");
+
 fn main() {
-    // Windows: the program's own icon (Explorer, Start menu); set before the window exists
+    // Windows: the program's own icon (Explorer, Start menu, taskbar before the
+    // window opens) and its version details
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
-        println!("cargo:rerun-if-changed=pastezo.rc");
+        println!("cargo:rerun-if-changed=version_rc.rs");
         println!("cargo:rerun-if-changed=icons/icon.ico");
-        embed_resource::compile("pastezo.rc", embed_resource::NONE).manifest_optional().expect("compile pastezo.rc");
+        let icon = std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap()).join("icons").join("icon.ico");
+        let rc = format!("1 ICON \"{}\"\n{}", icon.display().to_string().replace('\\', "\\\\"), version_rc("Pastezo", "Pastezo"));
+        let path = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("pastezo.rc");
+        std::fs::write(&path, rc).unwrap();
+        embed_resource::compile(&path, embed_resource::NONE).manifest_optional().expect("compile pastezo.rc");
     }
 
     // Widget style per OS: the only std widget we use is ListView (its scrollbar).

@@ -1,11 +1,11 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::types::Value;
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row, Transaction};
 
 use crate::code::looks_like_code;
-use crate::model::{link_of, Clip, ClipKind};
+use crate::model::{link_of, Clip, ClipContent, ClipKind};
 use crate::search::{fuzzy_matches, trigram_query, Search, SearchKind, FUZZY_MIN_CHARS};
 use crate::Result;
 
@@ -153,6 +153,58 @@ CREATE TABLE copy_stats (
 ) WITHOUT ROWID;
 "#,
         code: None,
+    },
+    // v7: the content hash is XXH3 instead of BLAKE3 (`ClipContent::hash`),
+    // so a repeat of an older clip is still found. Image files are named by
+    // the hash: they are renamed too. A clip whose files cannot be read or
+    // moved keeps its old hash (nothing will match it, it still shows).
+    Migration {
+        sql: "DELETE FROM own_writes;",
+        code: Some(|tx| {
+            let mut read = tx.prepare(
+                "SELECT clips.id, clips.kind, clip_texts.text, clips.image_path, clips.thumb_path
+                 FROM clips LEFT JOIN clip_texts ON clip_texts.id = clips.id",
+            )?;
+            let rows = read.query_map([], |r| {
+                Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, Option<String>>(2)?, r.get::<_, Option<String>>(3)?, r.get::<_, Option<String>>(4)?))
+            })?;
+            let mut text_hash = tx.prepare("UPDATE OR IGNORE clips SET hash = ?2 WHERE id = ?1")?;
+            let mut image_hash = tx.prepare("UPDATE OR IGNORE clips SET hash = ?2, image_path = ?3, thumb_path = ?4 WHERE id = ?1")?;
+            for row in rows {
+                let (id, kind, text, image, thumb) = row?;
+                if ClipKind::from_db(kind) == ClipKind::Text {
+                    if let Some(text) = text {
+                        text_hash.execute(params![id, ClipContent::Text(text).hash()])?;
+                    }
+                    continue;
+                }
+                let Some(image) = image.map(PathBuf::from) else { continue };
+                let Ok(png) = std::fs::read(&image) else { continue };
+                let hash = ClipContent::Image(png).hash();
+                // `<hash>.png`, `<hash>_thumb.jpg` / `.png`, in the same folder
+                let renamed = |old: &Path, suffix: &str| {
+                    let ext = old.extension().and_then(|e| e.to_str()).unwrap_or("png");
+                    old.with_file_name(format!("{hash}{suffix}.{ext}"))
+                };
+                let mut moves = vec![(image.clone(), renamed(&image, ""))];
+                if let Some(t) = thumb.map(PathBuf::from).filter(|t| t.exists()) {
+                    let new = renamed(&t, "_thumb");
+                    moves.push((t, new));
+                }
+                let mut done = 0;
+                while done < moves.len() && std::fs::rename(&moves[done].0, &moves[done].1).is_ok() {
+                    done += 1;
+                }
+                let path = |i: usize| moves.get(i).map(|m| m.1.to_string_lossy().into_owned());
+                let kept = done == moves.len() && image_hash.execute(params![id, hash, path(0), path(1)])? == 1;
+                if !kept {
+                    for (old, new) in moves[..done].iter().rev() {
+                        let _ = std::fs::rename(new, old);
+                    }
+                }
+            }
+            Ok(())
+        }),
     },
 ];
 
@@ -823,6 +875,51 @@ mod tests {
         assert_eq!(s.search(&"buq".into(), 10).unwrap().len(), 1);
         let v: i64 = s.conn.pragma_query_value(None, "user_version", |r| r.get(0)).unwrap();
         assert_eq!(v as usize, MIGRATIONS.len());
+    }
+
+    #[test]
+    fn migration_v7_moves_hashes_and_image_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("db.sqlite");
+        let png = {
+            let mut out = std::io::Cursor::new(Vec::new());
+            image::RgbaImage::new(2, 2).write_to(&mut out, image::ImageFormat::Png).unwrap();
+            out.into_inner()
+        };
+        let (old_png, old_thumb) = (dir.path().join("old.png"), dir.path().join("old_thumb.jpg"));
+        std::fs::write(&old_png, &png).unwrap();
+        std::fs::write(&old_thumb, b"thumb").unwrap();
+        {
+            // a database as version 6 left it, BLAKE3 hashes (any other text here)
+            let conn = Connection::open(&path).unwrap();
+            for m in &MIGRATIONS[..6] {
+                conn.execute_batch(m.sql).unwrap();
+            }
+            conn.pragma_update(None, "user_version", 6).unwrap();
+            conn.execute("INSERT INTO clips (uuid, kind, preview, hash, created_at) VALUES ('a', 0, 'one', 'old-a', 1)", []).unwrap();
+            conn.execute("INSERT INTO clip_texts (id, text) VALUES (last_insert_rowid(), 'one')", []).unwrap();
+            conn.execute(
+                "INSERT INTO clips (uuid, kind, image_path, thumb_path, hash, created_at) VALUES ('b', 1, ?1, ?2, 'old-b', 2)",
+                params![old_png.to_string_lossy(), old_thumb.to_string_lossy()],
+            )
+            .unwrap();
+            // its image is gone: kept as it is
+            conn.execute("INSERT INTO clips (uuid, kind, image_path, hash, created_at) VALUES ('c', 1, '/gone.png', 'old-c', 3)", []).unwrap();
+            conn.execute("INSERT INTO own_writes (hash, at) VALUES ('old-a', 1)", []).unwrap();
+        }
+        let s = Store::open(&path).unwrap();
+        let text_hash = ClipContent::Text("one".into()).hash();
+        let image_hash = ClipContent::Image(png.clone()).hash();
+        assert!(s.contains(&text_hash).unwrap());
+        assert!(s.contains(&image_hash).unwrap());
+        assert!(s.contains("old-c").unwrap());
+        assert!(!s.take_own_write("old-a").unwrap());
+        let image = s.list(0, 10).unwrap().into_iter().find(|c| c.hash == image_hash).unwrap();
+        let (new_png, new_thumb) = (dir.path().join(format!("{image_hash}.png")), dir.path().join(format!("{image_hash}_thumb.jpg")));
+        assert_eq!(image.image_path.as_deref(), Some(new_png.to_str().unwrap()));
+        assert_eq!(image.thumb_path.as_deref(), Some(new_thumb.to_str().unwrap()));
+        assert_eq!(std::fs::read(&new_png).unwrap(), png);
+        assert!(new_thumb.exists() && !old_png.exists() && !old_thumb.exists());
     }
 
     #[test]

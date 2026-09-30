@@ -6,3 +6,7 @@ description = "Pastezo background process: records the clipboard history, has no
 
 [dependencies]
 clip-core = { path = "../../crates/clip-core" }
+
+[build-dependencies]
+# Windows: the .exe version details (build.rs); does nothing on other targets
+embed-resource = "3"

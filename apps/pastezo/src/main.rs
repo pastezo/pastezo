@@ -2129,7 +2129,7 @@ mod tests {
     }
 
     /// Settings → General → "Open Pastezo at login" is kept in settings.json
-    /// (on by default) and shown again next time.
+    /// (off by default) and shown again next time.
     #[test]
     fn launch_at_login_is_saved() {
         testing::init_no_event_loop();
@@ -2139,15 +2139,15 @@ mod tests {
         let app = wire(&ui, history, I18n::new(&sys()), "macos", Arc::new(FakeClipboard::default()), Box::new(|_| {}), Some(dir.path().into()));
         app.open_settings();
         let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
-        assert!(w.get_launch_at_login(), "on by default");
+        assert!(!w.get_launch_at_login(), "off by default");
         let check = testing::ElementHandle::find_by_accessible_label(&w, "Open Pastezo at login").next().unwrap();
         check.invoke_accessible_default_action();
-        assert!(!w.get_launch_at_login());
-        assert!(!Settings::load(dir.path()).launch_at_login);
+        assert!(w.get_launch_at_login());
+        assert!(Settings::load(dir.path()).launch_at_login);
         app.close_settings();
         app.open_settings();
         let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
-        assert!(!w.get_launch_at_login(), "shown as saved");
+        assert!(w.get_launch_at_login(), "shown as saved");
     }
 
     /// Settings → General → "Hide Pastezo during screen sharing": off by
@@ -2193,9 +2193,9 @@ mod tests {
         // General: the first control is the launch check box
         key(Key::Tab.into());
         let launch = testing::ElementHandle::find_by_accessible_label(&w, "Open Pastezo at login").next().unwrap();
-        assert_eq!(launch.accessible_checked(), Some(true));
-        key(" ".into());
         assert_eq!(launch.accessible_checked(), Some(false));
+        key(" ".into());
+        assert_eq!(launch.accessible_checked(), Some(true));
 
         // Typography: "Aa", the three presets, then the font size slider
         w.set_tab(1);
