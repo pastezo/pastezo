@@ -16,6 +16,10 @@ use crate::{Error, Result};
 /// saved at all — nothing a history is for, and megabytes on every search.
 pub const MAX_CLIP_BYTES: usize = 5 * 1024 * 1024;
 
+/// Settings → General → Keep clips (`History::keep_days`), in the data folder.
+const KEEP_DAYS_FILE: &str = "keep-days";
+const DAY_MS: i64 = 24 * 60 * 60 * 1000;
+
 /// Longest side of an image preview, in pixels (2x for retina).
 const THUMB_SIZE: u32 = 720;
 /// Previews of opaque images are JPEG: several times smaller than PNG and
@@ -37,6 +41,8 @@ pub fn data_dir() -> Option<PathBuf> {
 pub struct History {
     store: Mutex<Store>,
     images_dir: PathBuf,
+    /// the data folder: `keep-days` is there
+    dir: PathBuf,
 }
 
 impl History {
@@ -45,7 +51,7 @@ impl History {
         let images_dir = data_dir.join("images");
         fs::create_dir_all(&images_dir)?;
         let store = Mutex::new(Store::open(&data_dir.join("clips.sqlite"))?);
-        Ok(History { store, images_dir })
+        Ok(History { store, images_dir, dir: data_dir.to_path_buf() })
     }
 
     /// Saves new clipboard content. Returns `None` for content that is not
@@ -211,6 +217,38 @@ impl History {
                 let _ = fs::remove_file(p);
             }
         }
+    }
+
+    /// Settings → General → Keep clips: for how many days clips stay
+    /// (`None`: for ever). Saved as the `keep-days` file, so the agent reads
+    /// it too; a missing or broken file is "for ever".
+    pub fn keep_days(&self) -> Option<u32> {
+        let text = fs::read_to_string(self.dir.join(KEEP_DAYS_FILE)).ok()?;
+        text.trim().parse().ok().filter(|&d| d > 0)
+    }
+
+    pub fn set_keep_days(&self, days: Option<u32>) -> Result<()> {
+        let file = self.dir.join(KEEP_DAYS_FILE);
+        match days {
+            Some(d) => fs::write(file, d.to_string())?,
+            None => match fs::remove_file(file) {
+                Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e.into()),
+                _ => {}
+            },
+        }
+        Ok(())
+    }
+
+    /// Deletes the clips older than `keep_days` (pinned ones stay) with their
+    /// files; returns how many went.
+    pub fn forget_old(&self, now_ms: i64) -> Result<usize> {
+        let Some(days) = self.keep_days() else { return Ok(0) };
+        let clips = self.store.lock().unwrap().delete_before(now_ms - i64::from(days) * DAY_MS)?;
+        let n = clips.len();
+        for clip in clips {
+            self.discard(Deleted { clip, text: None });
+        }
+        Ok(n)
     }
 
     /// Pins a clip to the top of the list, or unpins it.
@@ -441,6 +479,40 @@ mod tests {
         h.add(&ClipContent::Image(png()), None).unwrap();
         h.discard(d);
         assert!(Path::new(img.image_path.as_ref().unwrap()).exists());
+    }
+
+    #[test]
+    fn old_clips_are_forgotten_but_pinned_ones_stay() {
+        let dir = tempfile::tempdir().unwrap();
+        let h = History::open(dir.path()).unwrap();
+        let now = 100 * DAY_MS;
+        let at = |days_ago: i64| now - days_ago * DAY_MS;
+        h.import(&ClipContent::Text("fresh".into()), None, at(3), false).unwrap();
+        h.import(&ClipContent::Text("old".into()), None, at(10), false).unwrap();
+        h.import(&ClipContent::Text("old pinned".into()), None, at(10), true).unwrap();
+        h.import(&ClipContent::Image(png()), None, at(40), false).unwrap();
+        let image = h.list(0, 10).unwrap().into_iter().find(|c| c.image_path.is_some()).unwrap();
+
+        // for ever by default: nothing goes
+        assert_eq!(h.keep_days(), None);
+        assert_eq!(h.forget_old(now).unwrap(), 0);
+
+        h.set_keep_days(Some(30)).unwrap();
+        assert_eq!(h.keep_days(), Some(30));
+        assert_eq!(h.forget_old(now).unwrap(), 1);
+        assert!(!Path::new(image.image_path.as_ref().unwrap()).exists(), "its files go too");
+        assert!(!Path::new(image.thumb_path.as_ref().unwrap()).exists());
+
+        h.set_keep_days(Some(7)).unwrap();
+        assert_eq!(h.forget_old(now).unwrap(), 1);
+        let left: Vec<_> = h.list(0, 10).unwrap().into_iter().map(|c| c.preview.unwrap()).collect();
+        assert_eq!(left, ["old pinned", "fresh"]);
+
+        h.set_keep_days(None).unwrap();
+        h.set_keep_days(None).unwrap(); // no file: still fine
+        assert_eq!(h.keep_days(), None);
+        fs::write(dir.path().join(KEEP_DAYS_FILE), "soon").unwrap();
+        assert_eq!(h.keep_days(), None, "a broken file keeps everything");
     }
 
     #[test]

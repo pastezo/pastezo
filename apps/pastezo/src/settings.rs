@@ -62,6 +62,25 @@ impl TextStyle {
     /// and 26 px are on them)
     pub const LINE: (f32, f32, f32) = (1.25, 1.95, 0.1);
     pub const GAP: (f32, f32, f32) = (10.0, 42.0, 4.0);
+    /// Settings → Typography → Preset: (id, size, line, gap), on the sliders' steps
+    pub const PRESETS: [(&str, f32, f32, f32); 3] =
+        [("compact", 14.0, 1.35, 14.0), ("default", 17.0, 1.45, 26.0), ("large", 20.0, 1.55, 34.0)];
+
+    /// This style with a preset's size, line height and spacing (the font stays).
+    pub fn with_preset(self, id: &str) -> Self {
+        match Self::PRESETS.iter().find(|p| p.0 == id) {
+            Some(&(_, size, line, gap)) => TextStyle { size, line, gap, ..self },
+            None => self,
+        }
+    }
+
+    /// The preset these values are, if any ("" otherwise).
+    pub fn preset(&self) -> &'static str {
+        Self::PRESETS
+            .iter()
+            .find(|p| (p.1, p.2, p.3) == (self.size, self.line, self.gap))
+            .map_or("", |p| p.0)
+    }
 
     /// Within the sliders' ranges, on their steps.
     pub fn fitted(self) -> Self {
