@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "clip-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "arboard",
  "clipboard-win",
@@ -3264,7 +3264,7 @@ dependencies = [
 
 [[package]]
 name = "pastezo"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "base64",
  "chrono",
@@ -3299,7 +3299,7 @@ dependencies = [
 
 [[package]]
 name = "pastezo-agent"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "clip-core",
  "embed-resource",

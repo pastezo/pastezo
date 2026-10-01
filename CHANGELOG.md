@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.1.0 (2026-10-01)
+
+### Features
+
+- Find clips typed in the English or Russian keyboard layout, with highlighted matching excerpts from the full text
+- Settings → General can keep clips for a week, a month or a year: older ones are deleted on their own, pinned ones stay
+- Links show their site's icon, taken from the site itself; Settings → General can turn it off
+- Settings → Typography has presets: Compact, Default and Large set the text size, line height and spacing in one click; "Defaults" is now "Reset font"
+
+#### Filter clipboard history with colorful smart hashtags
+
+Automatically recognize email addresses, phone numbers, websites, code, JSON, hex colors and images. Tags are hidden by default; enable Show automatic tags in Settings → General. Tags apply to existing history and new copies, and combine with text search.
+
+Recognize websites only when the clip is a standalone HTTP(S) or www address. Remove incorrect website tags from saved prose and code containing links.
+
+Use flat rounded hashtags with pastel color accents and larger 14 px labels, without outlines, shadows or counters. Highlight selection and keyboard focus using a stronger color fill. Translate the automatic-tags visibility setting into every supported language.
+
+Keep the All button fixed at the start of the tag row, including while scrolling tags, and highlight it when no tag filter is selected. Hide tags with no clips and clear a selected tag when its last clip is deleted.
+
+Align the tag row's colored faces with the left edge of clipboard snippets.
+
+### Fixes
+
+- Fewer antivirus false alarms on Windows: "Open Pastezo at login" is off until turned on (never set up from a temp folder), the update check uses the system's WinHTTP instead of running curl.exe, and both .exe files carry version details
+- The clip content hash is XXH3 instead of BLAKE3 (no cryptographic code in the app); the history is moved over on the first start, so repeats of older clips are still found
+
 ## 1.0.0 (2026-09-29)
 
 ### Features
