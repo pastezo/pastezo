@@ -27,7 +27,7 @@ pub struct Clip {
     pub id: i64,
     pub uuid: String,
     pub kind: ClipKind,
-    /// First `store::PREVIEW_CHARS` characters of a text clip.
+    /// First `store::PREVIEW_CHARS` characters, or a matching excerpt in search results.
     pub preview: Option<String>,
     /// Set when the whole text is a single web link (see `link_of`).
     pub link: Option<String>,
@@ -41,6 +41,10 @@ pub struct Clip {
     pub pinned: bool,
     /// Text that looks like code: shown in a monospaced font (`code::looks_like_code`).
     pub code: bool,
+    /// Search-only excerpt start, in UTF-8 bytes of the original text.
+    pub preview_offset: usize,
+    /// The highlighted range, in UTF-8 bytes relative to `preview`.
+    pub match_range: Option<std::ops::Range<usize>>,
 }
 
 /// The web address to open when the whole text is a single http(s) link

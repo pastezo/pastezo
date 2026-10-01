@@ -82,6 +82,12 @@ fn day_start(value: &str, now: DateTime<Local>) -> Option<i64> {
     Local.from_local_datetime(&day.and_hms_opt(0, 0, 0)?).earliest().map(|t| t.timestamp_millis())
 }
 
+/// Calendar-day boundaries, not a fixed 24-hour duration (DST can change it).
+pub fn date_bounds(day: NaiveDate) -> Option<(i64, i64)> {
+    let midnight = |d: NaiveDate| Local.from_local_datetime(&d.and_hms_opt(0, 0, 0)?).earliest().map(|t| t.timestamp_millis());
+    Some((midnight(day)?, midnight(day.succ_opt()?)?))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

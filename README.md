@@ -46,6 +46,7 @@
 
 - 📋&nbsp;Keeps everything you copy: text, links and images.
 - 🔍&nbsp;Search that forgives typos, with filters: `app:Safari`, `type:image`, `after:yesterday`.
+- #️⃣&nbsp;Optional colorful smart tags for emails, phones, websites, code, JSON, colors and images. Enable Show automatic tags in Settings → General.
 - ⌨️&nbsp;Works from the keyboard: arrows, preview, copy, delete.
 - ↩️&nbsp;Deleted a clip by mistake? ⌘Z brings it back.
 - 🧑‍💻&nbsp;Code is recognised and shown in a monospace font.
@@ -82,6 +83,10 @@ On Linux, unpack the archive and run `./install.sh` — it installs Pastezo into
 | Paste one of the first nine clips | ⌘1…⌘9 | Ctrl+1…9 |
 | Preview | Space | Space |
 | Delete | ⌫ | Delete |
+
+## Finding and inspecting clips
+
+- Search also tries the other English/Russian keyboard layout: `ghbdtn` finds `Привет`, and `руддщ` finds `hello`. Existing `app:`, `type:`, `after:` and `before:` filters still apply. Results show a highlighted excerpt; copying or pasting uses the original clip.
 
 ## Build from source
 

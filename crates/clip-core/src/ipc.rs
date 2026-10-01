@@ -24,6 +24,8 @@ pub enum Request {
     Copy(i64, Option<Range<usize>>),
     /// Register the shortcut saved in the `hotkey` file.
     Hotkey,
+    /// A derived text value (e.g. one JSON node), kept alive by the Linux agent.
+    Text(String),
 }
 
 /// A request line: `copy <id>` (the whole clip), `copy <id> <start> <end>`
@@ -32,6 +34,15 @@ fn parse(line: &str) -> Option<Request> {
     let line = line.trim();
     if line == "hotkey" {
         return Some(Request::Hotkey);
+    }
+    if line == "text" { return Some(Request::Text(String::new())); }
+    if let Some(hex) = line.strip_prefix("text ") {
+        if hex.len() % 2 != 0 || hex.len() > 2 * crate::MAX_CLIP_BYTES { return None; }
+        let bytes: Option<Vec<u8>> = hex.as_bytes().chunks_exact(2).map(|pair| {
+            let digit = |c: u8| (c as char).to_digit(16).map(|n| n as u8);
+            Some(digit(pair[0])? * 16 + digit(pair[1])?)
+        }).collect();
+        return Some(Request::Text(String::from_utf8(bytes?).ok()?));
     }
     let mut words = line.strip_prefix("copy ")?.split(' ');
     let id = words.next()?.parse().ok()?;
@@ -48,6 +59,7 @@ fn line(request: &Request) -> String {
         Request::Copy(id, None) => format!("copy {id}"),
         Request::Copy(id, Some(r)) => format!("copy {id} {} {}", r.start, r.end),
         Request::Hotkey => "hotkey".into(),
+        Request::Text(text) => format!("text {}", text.as_bytes().iter().map(|b| format!("{b:02x}")).collect::<String>()),
     }
 }
 
@@ -135,6 +147,12 @@ mod tests {
         assert_eq!(parse("copy 7\n"), Some(Request::Copy(7, None)));
         assert_eq!(parse("copy 7 2 5"), Some(Request::Copy(7, Some(2..5))));
         assert_eq!(parse("hotkey\n"), Some(Request::Hotkey));
+        for text in ["", "hello\nПривет 😀", "\"quoted\"\ttext"] {
+            let request = Request::Text(text.into());
+            assert_eq!(parse(&line(&request)), Some(request));
+        }
+        assert_eq!(parse("text ff"), None);
+        assert_eq!(parse("text xyz"), None);
         assert_eq!(parse("copy 7 2"), None);
         assert_eq!(parse("copy 7 2 5 9"), None);
         assert_eq!(parse("copy x"), None);

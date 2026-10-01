@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::thread::LocalKey;
 
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 
@@ -12,8 +13,11 @@ pub const MAX_H: f32 = 120.0;
 /// Decoded previews kept around (a page on screen shows a handful).
 const CACHE: usize = 24;
 
+/// Decoded images by file, the last used first.
+pub type Cache = RefCell<VecDeque<(String, Image)>>;
+
 thread_local! {
-    static CACHE_LRU: RefCell<VecDeque<(String, Image)>> = const { RefCell::new(VecDeque::new()) };
+    static CACHE_LRU: Cache = const { RefCell::new(VecDeque::new()) };
 }
 
 /// Logical size of the preview box for an image file (reads only the header).
@@ -31,7 +35,13 @@ pub fn load(path: &str, scale_factor: f32) -> Image {
     if path.is_empty() {
         return Image::default();
     }
-    if let Some(img) = CACHE_LRU.with(|c| {
+    cached(&CACHE_LRU, CACHE, path, || decode(path, scale_factor))
+}
+
+/// `path`'s image from `cache`, made by `make` if it is not there (then kept,
+/// `keep` images at most).
+pub fn cached(cache: &'static LocalKey<Cache>, keep: usize, path: &str, make: impl FnOnce() -> Option<Image>) -> Image {
+    if let Some(img) = cache.with(|c| {
         let mut c = c.borrow_mut();
         let i = c.iter().position(|(p, _)| p == path)?;
         let hit = c.remove(i)?;
@@ -40,11 +50,11 @@ pub fn load(path: &str, scale_factor: f32) -> Image {
     }) {
         return img;
     }
-    let img = decode(path, scale_factor).unwrap_or_default();
-    CACHE_LRU.with(|c| {
+    let img = make().unwrap_or_default();
+    cache.with(|c| {
         let mut c = c.borrow_mut();
         c.push_front((path.to_string(), img.clone()));
-        c.truncate(CACHE);
+        c.truncate(keep);
     });
     img
 }

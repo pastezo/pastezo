@@ -120,6 +120,14 @@ impl I18n {
             .unwrap_or_else(|| date.to_string())
     }
 
+    pub fn day_heading(&self, day: chrono::NaiveDate, today: chrono::NaiveDate) -> String {
+        if day == today { return self.t("clip.today", &[]); }
+        if Some(day) == today.pred_opt() { return self.t("clip.yesterday", &[]); }
+        Date::try_new_gregorian(day.year(), day.month() as u8, day.day() as u8).ok()
+            .and_then(|d| self.day_month_year.as_ref().map(|f| f.format(&d).to_string()))
+            .unwrap_or_else(|| day.to_string())
+    }
+
     fn message(&self, key: &str) -> Option<&Message> {
         self.messages.get(key).or_else(|| self.fallback.get(key))
     }
