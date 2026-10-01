@@ -9,14 +9,19 @@ mod app_icon;
 mod backup;
 mod capture;
 mod drag;
+mod favicons;
 mod hotkey;
 mod i18n;
+mod json_view;
+mod organize;
 mod messages;
+mod net;
 mod paste;
 mod query;
 mod settings;
 mod snapshot;
 mod stats;
+mod tags;
 mod system;
 mod themes;
 mod thumbs;
@@ -32,6 +37,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use chrono::TimeZone;
 use clip_core::platform::SystemClipboard;
 use clip_core::{Clip, ClipboardBackend, History};
 #[cfg(test)]
@@ -75,6 +81,8 @@ struct App {
     /// where settings.json lives (None in tests: not saved)
     settings_dir: Option<std::path::PathBuf>,
     settings: RefCell<Settings>,
+    /// site icons of links, kept next to the settings (None in tests)
+    favicons: Option<favicons::Favicons>,
     /// created on demand, dropped when closed (no memory while not shown)
     settings_window: RefCell<Option<SettingsWindow>>,
     settings_toaster: RefCell<Option<Toaster<SettingsWindow>>>,
@@ -90,6 +98,11 @@ struct App {
     loaded: Cell<u32>,
     has_more: Cell<bool>,
     query: RefCell<String>,
+    day: Cell<Option<chrono::NaiveDate>>,
+    tag: RefCell<Option<String>>,
+    raw_clips: RefCell<Vec<Clip>>,
+    expanded_groups: RefCell<std::collections::HashSet<i64>>,
+    json_tree: RefCell<Option<json_view::Tree>>,
     data_version: Cell<i64>,
     timers: RefCell<Vec<Rc<Timer>>>,
 }
@@ -124,8 +137,12 @@ fn same_row(a: &ClipItem, b: &ClipItem) -> bool {
     let text = |m: &ModelRc<Part>| m.iter().map(|p| p.text).collect::<Vec<_>>();
     a.id == b.id
         && a.preview == b.preview
+        && a.match_before == b.match_before && a.match_text == b.match_text && a.match_after == b.match_after
+        && a.preview_offset == b.preview_offset && a.day_heading == b.day_heading
+        && a.group_label == b.group_label && a.group_expanded == b.group_expanded
         && a.removing == b.removing
         && a.link == b.link
+        && a.favicon == b.favicon
         && a.thumb_path == b.thumb_path
         && a.text_rtl == b.text_rtl
         && a.pinned == b.pinned
@@ -144,7 +161,16 @@ impl App {
         let thumb = c.thumb_path.unwrap_or_default();
         let rtl = self.i18n.rtl;
         let (tw, th) = if thumb.is_empty() { (0.0, 0.0) } else { thumbs::display_size(&thumb) };
+        let preview = c.preview.as_deref().unwrap_or_default();
+        let (before, matched, after) = match c.match_range.as_ref() {
+            Some(r) => (&preview[..r.start], &preview[r.clone()], &preview[r.end..]),
+            None => ("", "", ""),
+        };
+        let search_parts = (if c.preview_offset > 0 { format!("…{before}") } else { before.to_string() }, matched.to_string(), after.to_string());
         ClipItem {
+            preview_offset: c.preview_offset as i32,
+            match_before: search_parts.0.into(), match_text: search_parts.1.into(), match_after: search_parts.2.into(),
+            day_heading: "".into(), group_label: "".into(), group_expanded: false,
             id: c.id as i32,
             is_image: c.image_path.is_some(),
             // code reads left to right whatever its comments are in
@@ -153,6 +179,10 @@ impl App {
             preview: c.preview.unwrap_or_default().into(),
             is_link: c.link.is_some(),
             is_code: c.code,
+            favicon: match (&c.link, &self.favicons) {
+                (Some(link), Some(f)) if self.settings.borrow().show_favicons => f.path(link).into(),
+                _ => SharedString::default(),
+            },
             link: c.link.unwrap_or_default().into(),
             thumb_path: thumb.into(),
             thumb_width: tw,
@@ -166,20 +196,80 @@ impl App {
         }
     }
 
-    fn items(&self, clips: Vec<Clip>) -> Vec<ClipItem> {
-        let now = chrono::Local::now();
-        clips.into_iter().map(|c| self.item(c, now)).collect()
+    fn searching(&self) -> bool {
+        !self.query.borrow().trim().is_empty() || self.day.get().is_some() || self.tag.borrow().is_some()
     }
 
-    fn searching(&self) -> bool {
-        !self.query.borrow().trim().is_empty()
+    fn show_history(&self) {
+        let clips = self.raw_clips.borrow();
+        let now = chrono::Local::now();
+        let mut items = Vec::new();
+        let mut previous_day = None;
+        let grouping = self.ui.upgrade().is_some_and(|ui| Features::get(&ui).get_grouping());
+        let dates = self.ui.upgrade().is_some_and(|ui| Features::get(&ui).get_dates());
+        for group in organize::groups(&clips, grouping && self.settings.borrow().group_similar && self.query.borrow().trim().is_empty()) {
+            let head = &clips[group[0]];
+            let expanded = self.expanded_groups.borrow().contains(&head.id);
+            for (n, index) in group.iter().enumerate() {
+                if n > 0 && !expanded { break; }
+                let c = &clips[*index];
+                let mut item = self.item(c.clone(), now);
+                let day = chrono::Local.timestamp_millis_opt(c.created_at).single().map(|d| d.date_naive());
+                if dates && day != previous_day {
+                    if let Some(day) = day { item.day_heading = self.i18n.day_heading(day, now.date_naive()).into(); }
+                    previous_day = day;
+                }
+                if n == 0 && group.len() > 1 {
+                    item.group_label = self.i18n.t("list.variants", &[("count", &group.len().to_string())]).into();
+                    item.group_expanded = expanded;
+                }
+                items.push(item);
+            }
+        }
+        self.show(items);
+    }
+
+    fn choose_date(&self, value: &str) {
+        let Some(ui) = self.ui.upgrade() else { return };
+        if !Features::get(&ui).get_dates() { return; }
+        let today = chrono::Local::now().date_naive();
+        let day = match value.trim() {
+            "" => None,
+            "today" => Some(today),
+            "yesterday" => today.pred_opt(),
+            v => match chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d") {
+                Ok(d) if query::date_bounds(d).is_some() => Some(d),
+                _ => { ui.set_date_error(self.i18n.t("list.invalidDate", &[]).into()); return; }
+            },
+        };
+        self.day.set(day);
+        self.loaded.set(PAGE);
+        ui.set_date_error("".into());
+        ui.set_date_input(day.map_or(String::new(), |d| d.to_string()).into());
+        ui.set_date_label(day.map_or_else(|| self.i18n.t("list.allDates", &[]), |d| self.i18n.day_heading(d, today)).into());
+        ui.set_date_open(false);
+        ui.set_selected_id(-1);
+        self.reload();
+        ui.invoke_scroll_top();
+        ui.invoke_focus_list();
     }
 
     /// Reloads what is on screen: the loaded pages, or the search results.
     fn reload(&self) {
+        self.refresh_tags();
         let _ = self.history.data_version().map(|v| self.data_version.set(v));
         let clips = if self.searching() {
-            self.history.search(&query::parse(&self.query.borrow(), chrono::Local::now()), SEARCH_LIMIT)
+            let mut search = query::parse(&self.query.borrow(), chrono::Local::now());
+            search.tag_id = self.tag.borrow().clone();
+            if let Some((start, end)) = self.day.get().and_then(query::date_bounds) {
+                search.after = Some(search.after.map_or(start, |t| t.max(start)));
+                search.before = Some(search.before.map_or(end, |t| t.min(end)));
+            }
+            let n = if self.query.borrow().trim().is_empty() { self.loaded.get().max(PAGE) } else { SEARCH_LIMIT };
+            self.history.search(&search, n).inspect(|c| {
+                self.loaded.set(c.len() as u32);
+                self.has_more.set(self.query.borrow().trim().is_empty() && c.len() as u32 == n);
+            })
         } else {
             let n = self.loaded.get().max(PAGE);
             self.history.list(0, n).inspect(|c| {
@@ -188,7 +278,7 @@ impl App {
             })
         };
         match clips {
-            Ok(c) => self.show(self.items(c)),
+            Ok(c) => { *self.raw_clips.borrow_mut() = c; self.show_history(); }
             Err(e) => eprintln!("pastezo: {e}"),
         }
         if let Some(ui) = self.ui.upgrade() {
@@ -237,19 +327,9 @@ impl App {
     }
 
     fn load_more(&self) {
-        if self.searching() || !self.has_more.get() {
-            return;
-        }
-        match self.history.list(self.loaded.get(), PAGE) {
-            Ok(page) => {
-                self.has_more.set(page.len() as u32 == PAGE);
-                self.loaded.set(self.loaded.get() + page.len() as u32);
-                for item in self.items(page) {
-                    self.model.push(item);
-                }
-            }
-            Err(e) => eprintln!("pastezo: {e}"),
-        }
+        if !self.query.borrow().trim().is_empty() || !self.has_more.get() { return; }
+        self.loaded.set(self.loaded.get() + PAGE);
+        self.reload();
     }
 
     /// Another process (the agent) changed the history since we last looked.
@@ -357,6 +437,11 @@ impl App {
         let Some((index, id)) = self.selected() else { return };
         let (Some(ui), Some(item)) = (self.ui.upgrade(), self.model.row_data(index)) else { return };
         let Ok(Some(clip)) = self.history.get(id) else { return };
+        *self.json_tree.borrow_mut() = None;
+        ui.set_preview_json(false);
+        ui.set_json_raw(false);
+        ui.set_json_error("".into());
+        ui.set_json_rows(ModelRc::default());
         if let Some(path) = &clip.image_path {
             ui.set_preview_image(slint::Image::load_from_path(std::path::Path::new(path)).unwrap_or_default());
             ui.set_preview_is_image(true);
@@ -365,6 +450,12 @@ impl App {
                 Ok(clip_core::ClipContent::Text(t)) => t,
                 _ => clip.preview.clone().unwrap_or_default(),
             };
+            if Features::get(&ui).get_json_tree() && text.trim_start().starts_with(['{', '[']) && text.chars().count() <= PREVIEW_CHARS {
+                match json_view::Tree::parse(&text) {
+                    Ok(tree) => { *self.json_tree.borrow_mut() = Some(tree); ui.set_preview_json(true); self.refresh_json(); }
+                    Err(e) => ui.set_json_error(self.i18n.t("json.invalid", &[("line", &e.line().to_string()), ("column", &e.column().to_string())]).into()),
+                }
+            }
             let text = match text.char_indices().nth(PREVIEW_CHARS) {
                 Some((cut, _)) => format!("{}…", &text[..cut]),
                 None => text,
@@ -381,10 +472,41 @@ impl App {
     fn close_preview(&self) {
         let Some(ui) = self.ui.upgrade() else { return };
         ui.set_preview_open(false);
+        *self.json_tree.borrow_mut() = None;
+        ui.set_json_rows(ModelRc::default());
+        ui.set_preview_json(false);
+        ui.set_json_error("".into());
         ui.invoke_focus_list();
         // the full text or image is not kept once it is off screen
         ui.set_preview_text(SharedString::default());
         ui.set_preview_image(slint::Image::default());
+    }
+
+    fn refresh_json(&self) {
+        let Some(ui) = self.ui.upgrade() else { return };
+        if let Some(tree) = self.json_tree.borrow_mut().as_mut() {
+            ui.set_json_rows(ModelRc::new(VecModel::from(tree.rows())));
+            ui.set_json_error(if tree.truncated { self.i18n.t("json.limited", &[]) } else { String::new() }.into());
+        }
+    }
+
+    fn copy_json(&self, path: &str) {
+        let value = self.json_tree.borrow().as_ref().and_then(|t| t.copy_value(path));
+        if let Some(text) = value {
+            let content = clip_core::ClipContent::Text(text);
+            let _ = self.history.mark_own_write(&content);
+            #[cfg(target_os = "linux")]
+            if let clip_core::ClipContent::Text(text) = &content {
+                if clip_core::data_dir().is_some_and(|dir| clip_core::ipc::request(&dir, clip_core::ipc::Request::Text(text.clone())) == Some(true)) {
+                    self.toaster.show(ToastKind::Success, self.i18n.t("toast.copied", &[]));
+                    return;
+                }
+            }
+            match self.clipboard.write(&content) {
+                Ok(_) => self.toaster.show(ToastKind::Success, self.i18n.t("toast.copied", &[])),
+                Err(_) => self.toaster.show(ToastKind::Error, self.i18n.t("toast.copyFailed", &[])),
+            }
+        }
     }
 
     /// A printable key typed in the list: the search opens with it.
@@ -409,7 +531,8 @@ impl App {
         if start >= end {
             return;
         }
-        if let Err(e) = self.put_on_clipboard(id, Some(start..end)) {
+        let offset = self.position(id).and_then(|i| self.model.row_data(i)).map_or(0, |c| c.preview_offset.max(0) as usize);
+        if let Err(e) = self.put_on_clipboard(id, Some(start + offset..end + offset)) {
             eprintln!("pastezo: copy failed: {e}");
             self.toaster.show(ToastKind::Error, self.i18n.t("toast.copyFailed", &[]));
         }
@@ -452,6 +575,7 @@ impl App {
                 app.model.remove(i);
                 app.loaded.set(app.loaded.get().saturating_sub(1));
             }
+            app.reload();
         });
     }
 
@@ -552,6 +676,14 @@ where
     for<'a> Env<'a>: slint::Global<'a, T>,
 {
     let env = Env::get(ui);
+    env.set_group_similar(i18n.t("list.groupSimilar", &[]).into());
+    env.set_all_dates(i18n.t("list.allDates", &[]).into());
+    env.set_today_label(i18n.t("clip.today", &[]).into());
+    env.set_yesterday_label(i18n.t("clip.yesterday", &[]).into());
+    env.set_date_label(i18n.t("list.date", &[]).into());
+    env.set_go_date(i18n.t("list.goDate", &[]).into());
+    env.set_json_tree(i18n.t("json.tree", &[]).into());
+    env.set_json_raw(i18n.t("json.raw", &[]).into());
     env.set_tab_typography(i18n.t("settings.typography", &[]).into());
     env.set_text_font_label(i18n.t("settings.textFont", &[]).into());
     env.set_font_size_label(i18n.t("settings.fontSize", &[]).into());
@@ -595,6 +727,9 @@ where
     env.set_can_hide_from_capture(capture::AVAILABLE);
     env.set_privacy_label(i18n.t("settings.privacy", &[]).into());
     env.set_hide_from_capture(i18n.t("settings.hideFromCapture", &[]).into());
+    env.set_links_label(i18n.t("settings.links", &[]).into());
+    env.set_show_favicons(i18n.t("settings.showFavicons", &[]).into());
+    env.set_show_tags(i18n.t("settings.showTags", &[]).into());
     env.set_hotkey_label(i18n.t("settings.hotkey", &[]).into());
     env.set_hotkey_record(i18n.t("settings.hotkeyRecord", &[]).into());
     env.set_hotkey_typing(i18n.t("settings.hotkeyTyping", &[]).into());
@@ -754,12 +889,26 @@ impl App {
             }
         });
         self.wire_hotkey(&w);
+        w.set_show_tags(self.settings().show_tags);
+        w.on_show_tags_changed({
+            let app = Rc::downgrade(self);
+            move |on| { if let Some(app) = app.upgrade() { app.set_show_tags(on); } }
+        });
         w.set_hide_from_capture(self.settings().hide_from_capture);
         w.on_hide_from_capture_changed({
             let app = Rc::downgrade(self);
             move |on| {
                 if let Some(app) = app.upgrade() {
                     app.set_hide_from_capture(on);
+                }
+            }
+        });
+        w.set_show_favicons(self.settings().show_favicons);
+        w.on_show_favicons_changed({
+            let app = Rc::downgrade(self);
+            move |on| {
+                if let Some(app) = app.upgrade() {
+                    app.set_show_favicons(on);
                 }
             }
         });
@@ -1048,6 +1197,9 @@ impl App {
         if let Err(e) = self.history.clear() {
             return eprintln!("pastezo: {e}");
         }
+        if let Some(f) = &self.favicons {
+            f.clear();
+        }
         self.loaded.set(0);
         self.reload();
     }
@@ -1095,6 +1247,12 @@ impl App {
         if let Some(w) = self.settings_window.borrow().as_ref() {
             capture::apply(w.window(), hide);
         }
+    }
+
+    /// Settings → General: links with their site's icon, or all with the link icon.
+    fn set_show_favicons(&self, on: bool) {
+        self.save_settings(Settings { show_favicons: on, ..self.settings() });
+        self.reload();
     }
 
     fn set_icon(&self, id: &str) {
@@ -1262,6 +1420,7 @@ fn wire(
         toaster: Toaster::new(ui),
         i18n,
         os,
+        favicons: settings_dir.as_ref().map(|d| favicons::Favicons::new(d.join("favicons"), favicons::download)),
         settings_dir,
         settings: RefCell::new(settings),
         settings_window: RefCell::new(None),
@@ -1274,15 +1433,40 @@ fn wire(
         loaded: Cell::new(0),
         has_more: Cell::new(true),
         query: RefCell::new(String::new()),
+        day: Cell::new(None),
+        tag: RefCell::new(None),
+        raw_clips: RefCell::new(Vec::new()),
+        expanded_groups: RefCell::new(std::collections::HashSet::new()),
+        json_tree: RefCell::new(None),
         data_version: Cell::new(0),
         timers: RefCell::new(Vec::new()),
     });
+    app.wire_tag_filters(ui);
+    ui.set_group_similar(app.settings.borrow().group_similar);
+    ui.set_date_label(app.i18n.t("list.allDates", &[]).into());
+    ui.on_choose_date({ let app = app.clone(); move |value| app.choose_date(&value) });
+    ui.on_toggle_grouping({ let app = app.clone(); move || {
+        let enabled = !app.settings.borrow().group_similar;
+        app.save_settings(Settings { group_similar: enabled, ..app.settings() });
+        if let Some(ui) = app.ui.upgrade() { ui.set_group_similar(enabled); }
+        app.show_history();
+    }});
+    ui.on_toggle_group({ let app = app.clone(); move |id| {
+        { let mut groups = app.expanded_groups.borrow_mut(); if !groups.remove(&(id as i64)) { groups.insert(id as i64); } }
+        app.show_history();
+    }});
+    ui.on_toggle_json({ let app = app.clone(); move |path| {
+        if let Some(tree) = app.json_tree.borrow_mut().as_mut() { tree.toggle(&path); }
+        app.refresh_json();
+    }});
+    ui.on_copy_json({ let app = app.clone(); move |path| app.copy_json(&path) });
     // the agent deletes them too, but may not have run since they got too old
     app.forget_old();
     app.reload();
 
     let scale = ui.window().scale_factor();
     Thumbs::get(ui).on_load(move |path| thumbs::load(&path, scale));
+    Thumbs::get(ui).on_favicon(move |path| favicons::load(&path, scale));
 
     ui.on_load_more({
         let app = app.clone();
@@ -1431,6 +1615,10 @@ fn wire(
                         stats::show(w, &app.history, &app.i18n, chrono::Local::now());
                     }
                 }
+                // site icons that came in: their rows show them
+                if app.favicons.as_ref().is_some_and(|f| f.take_fetched()) {
+                    app.reload();
+                }
             }
         }
     });
@@ -1440,13 +1628,14 @@ fn wire(
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     select_backend()?;
-    agent::ensure_running();
+    let snapshot_dir = std::env::var_os("PASTEZO_SNAPSHOT").and_then(|_| std::env::var_os("PASTEZO_SNAPSHOT_DATA_DIR")).map(std::path::PathBuf::from);
+    if snapshot_dir.is_none() { agent::ensure_running(); }
 
-    let dir = clip_core::data_dir().ok_or("no data folder on this OS")?;
+    let dir = snapshot_dir.clone().or_else(clip_core::data_dir).ok_or("no data folder on this OS")?;
     // the global shortcut brings this window forward instead of opening another
     let _running = clip_core::WindowLock::claim(&dir);
     // Settings → General: register (or remove) the agent's start at login
-    agent::set_autostart(Settings::load(&dir).launch_at_login);
+    if snapshot_dir.is_none() { agent::set_autostart(Settings::load(&dir).launch_at_login); }
     let history = Arc::new(History::open(&dir)?);
     let mut sys = system::system_info();
     // design checks in other languages: PASTEZO_LANG=ar cargo run -p pastezo
@@ -1560,6 +1749,175 @@ mod tests {
 
     fn previews(ui: &AppWindow) -> Vec<String> {
         ui.get_clips().iter().map(|c| c.preview.to_string()).collect()
+    }
+
+    #[test]
+    fn tags_are_optional_and_disabling_them_clears_the_filter() {
+        testing::init_no_event_loop();
+        let dir = tempfile::tempdir().unwrap();
+        // Settings saved by the previous version have no visibility preference.
+        std::fs::write(dir.path().join("settings.json"), r#"{"showFavicons":false}"#).unwrap();
+        let history = Arc::new(History::open(dir.path()).unwrap());
+        for t in ["hello@example.com", "second@example.org", "ordinary note"] {
+            history.add(&ClipContent::Text(t.into()), None).unwrap();
+        }
+        let ui = AppWindow::new().unwrap();
+        let app = wire(&ui, history.clone(), I18n::new(&sys()), "macos", Arc::new(FakeClipboard::default()), Box::new(|_| {}), Some(dir.path().into()));
+        ui.show().unwrap();
+        assert!(!ui.get_show_tags());
+        assert_eq!(ui.get_tags().row_count(), 0);
+        ui.invoke_choose_tag("email".into());
+        assert_eq!(ui.get_clips().row_count(),3, "hidden tags cannot filter the history");
+        app.open_settings();
+        let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
+        assert_eq!(w.get_tab(),0);
+        assert!(!w.get_show_tags());
+        assert_eq!(testing::ElementHandle::find_by_accessible_label(&w,"Tags").count(),0);
+        let toggle = testing::ElementHandle::find_by_accessible_label(&w,"Show automatic tags").next().unwrap();
+        toggle.invoke_accessible_default_action();
+        assert!(w.get_show_tags() && ui.get_show_tags());
+        assert!(Settings::load(dir.path()).show_tags);
+        assert!(!Settings::load(dir.path()).show_favicons);
+        assert_eq!(ui.get_tags().row_data(0).unwrap().count,2);
+        assert_eq!(testing::ElementHandle::find_by_accessible_label(&ui,"# +").count(),0);
+        let tag_viewport = testing::ElementHandle::find_by_element_id(&ui,"AppWindow::tag-scroll").next().unwrap();
+        let email_tag = testing::ElementHandle::find_by_accessible_label(&ui,"#email").next().unwrap();
+        assert!(email_tag.size().height > 0.0);
+        assert!(email_tag.absolute_position().y + email_tag.size().height
+            <= tag_viewport.absolute_position().y + tag_viewport.size().height,
+            "the scroll viewport must not clip the bottom of tags");
+        let all = testing::ElementHandle::find_by_accessible_label(&ui,"All").next().unwrap();
+        ui.invoke_choose_tag("email".into());
+        assert_eq!(ui.get_clips().row_count(),2);
+        all.invoke_accessible_default_action();
+        assert_eq!(ui.get_selected_tag(), "");
+        assert_eq!(ui.get_clips().row_count(),3, "All restores the complete history");
+        assert!(testing::ElementHandle::find_by_accessible_label(&ui,"All").next().is_some(), "All stays available after clearing the filter");
+        ui.invoke_choose_tag("email".into());
+        ui.invoke_query_edited("second".into());
+        testing::mock_elapsed_time(Duration::from_millis(200));
+        assert_eq!(previews(&ui),["second@example.org"]);
+        toggle.invoke_accessible_default_action();
+        assert!(!ui.get_show_tags() && !w.get_show_tags());
+        assert_eq!(ui.get_selected_tag(), "");
+        assert_eq!(ui.get_tags().row_count(),0);
+        assert_eq!(previews(&ui),["second@example.org"], "text search survives hiding tags");
+        ui.invoke_query_edited("".into());
+        testing::mock_elapsed_time(Duration::from_millis(200));
+        assert_eq!(ui.get_clips().row_count(),3);
+        assert!(!Settings::load(dir.path()).show_tags);
+        toggle.invoke_accessible_default_action();
+        let reopened = AppWindow::new().unwrap();
+        let reopened_app = wire(&reopened, history.clone(), I18n::new(&sys()), "macos", Arc::new(FakeClipboard::default()), Box::new(|_| {}), Some(dir.path().into()));
+        assert!(reopened.get_show_tags(), "enabled preference survives reopening");
+        assert_eq!(reopened.get_tags().row_count(),1);
+        reopened.invoke_choose_tag("email".into());
+        for clip in history.list(0,10).unwrap() {
+            if clip.preview.as_deref().is_some_and(|text| text.contains('@')) { history.delete(clip.id).unwrap(); }
+        }
+        reopened_app.reload();
+        assert_eq!(reopened.get_tags().row_count(),0, "the tag disappears after its last clip is deleted");
+        assert_eq!(reopened.get_selected_tag(), "", "an empty selected tag cannot leave the history filtered");
+        assert_eq!(previews(&reopened),["ordinary note"]);
+        history.add(&ClipContent::Text("new@example.com".into()),None).unwrap();
+        reopened_app.reload();
+        assert_eq!(reopened.get_tags().row_count(),1, "the tag returns with a newly copied matching clip");
+    }
+
+    #[test]
+    fn hidden_features_stay_hidden_with_saved_preferences() {
+        testing::init_no_event_loop();
+        let dir = tempfile::tempdir().unwrap();
+        Settings { group_similar: true, ..Settings::default() }.save(dir.path()).unwrap();
+        let history = Arc::new(History::open(dir.path()).unwrap());
+        for text in ["git log --oneline --max-count 10", "git log --oneline --max-count 20", r#"{"ok":true}"#, "{invalid}"] {
+            history.add(&ClipContent::Text(text.into()), Some("Editor")).unwrap();
+        }
+        let ui = AppWindow::new().unwrap();
+        let app = wire(&ui, history, I18n::new(&sys()), "macos", Arc::new(FakeClipboard::default()), Box::new(|_| {}), Some(dir.path().into()));
+        ui.show().unwrap();
+        // A previously enabled grouping preference must neither hide originals
+        // nor resurrect any controls or date sections in the ordinary app.
+        assert!(app.settings().group_similar);
+        assert_eq!(ui.get_clips().row_count(), 4);
+        assert!(ui.get_clips().iter().all(|c| c.group_label.is_empty() && c.day_heading.is_empty()));
+        ui.set_date_open(true);
+        for label in ["All dates", "All dates ▾", "Group similar", "Go to date"] {
+            assert_eq!(testing::ElementHandle::find_by_accessible_label(&ui, label).count(), 0, "{label}");
+        }
+        ui.invoke_choose_date("yesterday".into());
+        assert_eq!(ui.get_clips().row_count(), 4);
+        for index in [0, 1] {
+            ui.set_selected_id(ui.get_clips().row_data(index).unwrap().id);
+            ui.invoke_preview_selected();
+            assert!(ui.get_preview_open());
+            assert!(!ui.get_preview_json());
+            assert_eq!(ui.get_json_rows().row_count(), 0);
+            assert!(ui.get_json_error().is_empty());
+            assert_eq!(testing::ElementHandle::find_by_accessible_label(&ui, "Original text").count(), 0);
+            ui.invoke_close_preview();
+        }
+    }
+
+    #[test]
+    fn new_history_workflows_keep_copy_and_navigation_correct() {
+        testing::init_no_event_loop();
+        let dir = tempfile::tempdir().unwrap();
+        let history = Arc::new(History::open(dir.path()).unwrap());
+        let today = chrono::Local::now().date_naive();
+        let (start, _) = query::date_bounds(today).unwrap();
+        let yesterday = query::date_bounds(today.pred_opt().unwrap()).unwrap().0;
+        let long = format!("{}Привет из конца записи", "prefix ".repeat(500));
+        history.import(&ClipContent::Text(long.clone()), Some("Editor"), start + 3000, false).unwrap();
+        history.import(&ClipContent::Text("git log --oneline --max-count 10".into()), Some("Terminal"), start + 1000, false).unwrap();
+        history.import(&ClipContent::Text("git log --oneline --max-count 20".into()), Some("Terminal"), start + 2000, false).unwrap();
+        history.import(&ClipContent::Text("older item".into()), Some("Notes"), yesterday + 1000, false).unwrap();
+        let ui = AppWindow::new().unwrap();
+        Features::get(&ui).set_dates(true);
+        Features::get(&ui).set_grouping(true);
+        Features::get(&ui).set_json_tree(true);
+        let clipboard = Arc::new(FakeClipboard::default());
+        let app = wire(&ui, history.clone(), I18n::new(&sys()), "macos", clipboard.clone(), Box::new(|_| {}), None);
+        assert_eq!(ui.get_clips().row_data(0).unwrap().day_heading, "Today");
+        assert_eq!(ui.get_clips().row_data(3).unwrap().day_heading, "Yesterday");
+        ui.invoke_choose_date("yesterday".into());
+        assert_eq!(previews(&ui), ["older item"]);
+        ui.invoke_choose_date("2026-02-30".into());
+        assert!(!ui.get_date_error().is_empty());
+        assert_eq!(previews(&ui), ["older item"]);
+        ui.invoke_choose_date("".into());
+        ui.invoke_toggle_grouping();
+        assert_eq!(ui.get_clips().row_count(), 3);
+        let group = ui.get_clips().iter().find(|c| !c.group_label.is_empty()).unwrap();
+        ui.invoke_toggle_group(group.id);
+        assert_eq!(ui.get_clips().row_count(), 4);
+        assert_eq!(history.list(0, 20).unwrap().len(), 4);
+        *app.query.borrow_mut() = "ghbdtn".into();
+        app.reload();
+        let hit = ui.get_clips().row_data(0).unwrap();
+        assert_eq!(hit.match_text, "Привет");
+        app.copy(hit.id as i64);
+        assert_eq!(clipboard.read(), Some(ClipContent::Text(long)));
+        *app.query.borrow_mut() = String::new();
+        let json = r#"{"user":{"name":"Лена","roles":["admin"]},"ok":true}"#;
+        history.add(&ClipContent::Text(json.into()), Some("Editor")).unwrap();
+        app.reload();
+        ui.set_selected_id(ui.get_clips().row_data(0).unwrap().id);
+        ui.invoke_preview_selected();
+        assert!(ui.get_preview_json());
+        ui.invoke_toggle_json("/user".into());
+        assert!(ui.get_json_rows().iter().any(|r| r.key == "name"));
+        ui.invoke_copy_json("/user/name".into());
+        assert_eq!(clipboard.read(), Some(ClipContent::Text("Лена".into())));
+        assert_eq!(history.list(0, 20).unwrap().len(), 5, "copying a value adds no history entry");
+        ui.invoke_close_preview();
+        assert_eq!(ui.get_json_rows().row_count(), 0);
+        history.add(&ClipContent::Text("{\ninvalid}".into()), Some("Editor")).unwrap();
+        app.reload();
+        ui.set_selected_id(ui.get_clips().row_data(0).unwrap().id);
+        ui.invoke_preview_selected();
+        assert!(!ui.get_preview_json());
+        assert!(ui.get_json_error().contains("line 2"));
     }
 
     /// Everything a user does in the window, against a real (temporary) database.
@@ -2174,6 +2532,37 @@ mod tests {
         app.open_settings();
         let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
         assert!(w.get_hide_from_capture(), "shown as saved");
+    }
+
+    /// A link shows its site's icon once it is saved (src/favicons.rs);
+    /// Settings → General → "Show site icons" (on by default) takes them away.
+    #[test]
+    fn links_show_site_icons() {
+        testing::init_no_event_loop();
+        let dir = tempfile::tempdir().unwrap();
+        let history = Arc::new(History::open(dir.path()).unwrap());
+        history.add(&ClipContent::Text("https://example.com/a?b=1".into()), None).unwrap();
+        history.add(&ClipContent::Text("Albuquerque".into()), None).unwrap();
+        // fetched earlier: no request
+        let icon = dir.path().join("favicons").join("example.com.png");
+        std::fs::create_dir_all(icon.parent().unwrap()).unwrap();
+        image::RgbaImage::new(16, 16).save(&icon).unwrap();
+        let ui = AppWindow::new().unwrap();
+        let app = wire(&ui, history, I18n::new(&sys()), "macos", Arc::new(FakeClipboard::default()), Box::new(|_| {}), Some(dir.path().into()));
+        let favicons = || ui.get_clips().iter().map(|c| c.favicon.to_string()).collect::<Vec<_>>();
+        assert_eq!(favicons(), ["", icon.to_str().unwrap()], "text has none");
+        app.open_settings();
+        let w = app.settings_window.borrow().as_ref().unwrap().clone_strong();
+        assert!(w.get_show_favicons(), "on by default");
+        let check = testing::ElementHandle::find_by_accessible_label(&w, "Show site icons").next().unwrap();
+        check.invoke_accessible_default_action();
+        assert!(!Settings::load(dir.path()).show_favicons);
+        assert_eq!(favicons(), ["", ""]);
+        check.invoke_accessible_default_action();
+        assert_eq!(favicons(), ["", icon.to_str().unwrap()]);
+        // Clear history: the sites it had go too
+        app.clear_history();
+        assert!(!icon.exists());
     }
 
     #[test]

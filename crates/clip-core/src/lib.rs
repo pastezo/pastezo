@@ -10,6 +10,7 @@ mod model;
 pub mod platform;
 mod search;
 mod store;
+pub mod tags;
 mod watcher;
 
 pub use hotkey::{Hotkey, WindowLock};
@@ -31,6 +32,8 @@ pub enum Error {
     Clipboard(String),
     #[error("clip {0} has no content")]
     Missing(i64),
+    #[error("{0}")]
+    InvalidTag(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

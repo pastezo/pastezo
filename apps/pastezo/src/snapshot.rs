@@ -6,6 +6,10 @@
 //! `PASTEZO_SNAPSHOT_SETTINGS=<tab>` (shoots the settings window instead),
 //! `PASTEZO_SNAPSHOT_CONFIRM=1` (there: "Clear all" already pressed once),
 //! `PASTEZO_SNAPSHOT_PREVIEW=<row>` (that row selected and previewed, Space).
+//! `PASTEZO_SNAPSHOT_DATA_DIR=<dir>` isolates QA from the user's data and agent.
+//! `PASTEZO_SNAPSHOT_DATE=<date|open>`, `PASTEZO_SNAPSHOT_GROUP=<row>`,
+//! `PASTEZO_SNAPSHOT_JSON_PATH=<pointer>`, `PASTEZO_SNAPSHOT_SIZE=480x360`.
+//! `PASTEZO_SNAPSHOT_TAG=<id>` (requires Show automatic tags enabled in the QA settings).
 
 use std::rc::Rc;
 use std::time::Duration;
@@ -50,6 +54,24 @@ pub fn setup(ui: &AppWindow, app: &Rc<App>) {
         return;
     }
 
+    if let Ok(tag) = std::env::var("PASTEZO_SNAPSHOT_TAG") { ui.invoke_choose_tag(tag.into()); }
+
+    if let Ok(size) = std::env::var("PASTEZO_SNAPSHOT_SIZE") {
+        if let Some((w, h)) = size.split_once('x').and_then(|(w, h)| Some((w.parse::<f32>().ok()?, h.parse::<f32>().ok()?))) {
+            ui.window().set_size(slint::LogicalSize::new(w, h));
+        }
+    }
+    let qa = ui.as_weak();
+    Timer::single_shot(Duration::from_millis(550), move || {
+        let Some(ui) = qa.upgrade() else { return };
+        if let Ok(date) = std::env::var("PASTEZO_SNAPSHOT_DATE") {
+            if date == "open" { ui.set_date_open(true); } else { ui.invoke_choose_date(date.into()); }
+        }
+        if let Some(row) = std::env::var("PASTEZO_SNAPSHOT_GROUP").ok().and_then(|s| s.parse::<usize>().ok()) {
+            if let Some(item) = ui.get_clips().row_data(row) { ui.invoke_toggle_group(item.id); }
+        }
+        if let Ok(path) = std::env::var("PASTEZO_SNAPSHOT_JSON_PATH") { ui.invoke_toggle_json(path.into()); }
+    });
     let weak = ui.as_weak();
     // PASTEZO_SNAPSHOT_SEARCH=<ms>: open the search first and shoot <ms> later
     let search_after: Option<u64> = std::env::var("PASTEZO_SNAPSHOT_SEARCH").ok().and_then(|v| v.parse().ok());

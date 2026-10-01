@@ -16,6 +16,11 @@ pub struct Settings {
     pub launch_at_login: bool,
     /// Settings → General: screen sharing and recording do not show the windows (`capture`)
     pub hide_from_capture: bool,
+    /// Settings → General: links show their site's icon (`favicons`)
+    pub show_favicons: bool,
+    /// Settings → General: optional smart tags, hidden until enabled.
+    pub show_tags: bool,
+    pub group_similar: bool,
     /// The list window as it was last closed; `None`: the design's size, placed by the OS.
     pub window: Option<WindowFrame>,
     /// Last look for a newer version (`update.rs`), ms since the epoch.
@@ -110,7 +115,7 @@ impl Default for TextStyle {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { theme: themes::LIGHT, icon: app_icon::DEFAULT, text: TextStyle::default(), launch_at_login: false, hide_from_capture: false, window: None, update_checked: None }
+        Settings { theme: themes::LIGHT, icon: app_icon::DEFAULT, text: TextStyle::default(), launch_at_login: false, hide_from_capture: false, show_favicons: true, show_tags: false, group_similar: false, window: None, update_checked: None }
     }
 }
 
@@ -138,6 +143,9 @@ impl Settings {
         // off unless turned on: the app does not add itself to the login items unasked
         let launch_at_login = json.get("launchAtLogin").and_then(|v| v.as_bool()).unwrap_or(false);
         let hide_from_capture = json.get("hideFromCapture").and_then(|v| v.as_bool()).unwrap_or(false);
+        let show_favicons = json.get("showFavicons").and_then(|v| v.as_bool()).unwrap_or(true);
+        let show_tags = json.get("showTags").and_then(|v| v.as_bool()).unwrap_or(false);
+        let group_similar = json.get("groupSimilar").and_then(|v| v.as_bool()).unwrap_or(false);
         let window = json.get("window").and_then(|w| {
             let num = |k: &str| w.get(k).and_then(|v| v.as_f64()).filter(|v| v.is_finite());
             let (width, height) = (num("width")? as f32, num("height")? as f32);
@@ -153,7 +161,7 @@ impl Settings {
             Some(WindowFrame { width, height, position, maximized })
         });
         let update_checked = json.get("updateChecked").and_then(|v| v.as_i64());
-        Settings { theme, icon, text, launch_at_login, hide_from_capture, window, update_checked }
+        Settings { theme, icon, text, launch_at_login, hide_from_capture, show_favicons, show_tags, group_similar, window, update_checked }
     }
 
     pub fn save(&self, dir: &Path) -> std::io::Result<()> {
@@ -164,6 +172,9 @@ impl Settings {
             "text": { "font": t.font, "size": t.size, "line": t.line, "gap": t.gap },
             "launchAtLogin": self.launch_at_login,
             "hideFromCapture": self.hide_from_capture,
+            "showFavicons": self.show_favicons,
+            "showTags": self.show_tags,
+            "groupSimilar": self.group_similar,
         });
         if let Some(w) = &self.window {
             let mut frame = serde_json::json!({ "width": w.width, "height": w.height, "maximized": w.maximized });
@@ -191,7 +202,7 @@ mod tests {
         assert_eq!(Settings::load(dir.path()), Settings::default());
         let text = TextStyle { font: "Helvetica".into(), size: 20.0, line: 1.65, gap: 14.0 };
         let window = Some(WindowFrame { width: 1000.0, height: 800.0, position: Some((-1200, 40, 2.0)), maximized: false });
-        let s = Settings { theme: "nightshade", icon: "sky", text, launch_at_login: true, hide_from_capture: true, window, update_checked: Some(1_790_000_000_000) };
+        let s = Settings { theme: "nightshade", icon: "sky", text, launch_at_login: true, hide_from_capture: true, show_favicons: false, show_tags: true, group_similar: true, window, update_checked: Some(1_790_000_000_000) };
         s.save(dir.path()).unwrap();
         assert_eq!(Settings::load(dir.path()), s);
         // a theme that no longer exists: back to the default

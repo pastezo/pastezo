@@ -61,6 +61,10 @@ fn main() {
             }
             #[cfg(not(target_os = "linux"))]
             Request::Copy(..) => false,
+            #[cfg(target_os = "linux")]
+            Request::Text(text) => watcher.write(&ClipContent::Text(text)).is_ok(),
+            #[cfg(not(target_os = "linux"))]
+            Request::Text(_) => false,
             Request::Hotkey => hotkeys.as_ref().is_some_and(|h| h.reload()),
         });
         if let Err(e) = served {

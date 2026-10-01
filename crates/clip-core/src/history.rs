@@ -172,6 +172,14 @@ impl History {
         self.store.lock().unwrap().list(offset, limit)
     }
 
+    pub fn tag_rules(&self) -> Result<Vec<crate::tags::TagRule>> { self.store.lock().unwrap().tag_rules() }
+
+    /// A separate WAL connection lets the window keep reading during reindexing.
+    pub fn save_tag(&self, rule: &crate::tags::TagRule) -> Result<()> {
+        Store::open(&self.dir.join("clips.sqlite"))?.save_tag(rule)
+    }
+    pub fn delete_tag(&self, id: &str) -> Result<()> { self.store.lock().unwrap().delete_tag(id) }
+
     pub fn search(&self, query: &Search, limit: u32) -> Result<Vec<Clip>> {
         self.store.lock().unwrap().search(query, limit)
     }

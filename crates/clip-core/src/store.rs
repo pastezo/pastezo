@@ -206,6 +206,9 @@ CREATE TABLE copy_stats (
             Ok(())
         }),
     },
+    Migration { sql: crate::tags::SCHEMA, code: Some(crate::tags::migrate) },
+    // v8 tagged prose/code containing a URL as a website; refresh old memberships.
+    Migration { sql: "", code: Some(crate::tags::refresh) },
 ];
 
 /// Statistics bucket: 15 minutes, in ms.
@@ -271,7 +274,11 @@ impl Store {
             .conn
             .pragma_query_value(None, "user_version", |r| r.get(0))?;
         for (i, m) in MIGRATIONS.iter().enumerate().skip(version as usize) {
-            let tx = self.conn.transaction()?;
+            // The window and agent can start together. Recheck after taking
+            // the write lock so only one of them performs each migration.
+            let tx = self.conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let current: i64 = tx.pragma_query_value(None, "user_version", |r| r.get(0))?;
+            if current > i as i64 { continue; }
             tx.execute_batch(m.sql)?;
             if let Some(code) = m.code {
                 code(&tx)?;
@@ -281,6 +288,10 @@ impl Store {
         }
         Ok(())
     }
+
+    pub fn tag_rules(&self) -> Result<Vec<crate::tags::TagRule>> { Ok(crate::tags::rules(&self.conn)?) }
+    pub fn save_tag(&mut self, rule: &crate::tags::TagRule) -> Result<()> { crate::tags::save(&mut self.conn, rule) }
+    pub fn delete_tag(&self, id: &str) -> Result<()> { crate::tags::delete(&self.conn, id) }
 
     /// Inserts a clip. If the same content (hash) is already in the history,
     /// nothing changes: no duplicate, and the existing entry keeps its place,
@@ -318,6 +329,7 @@ impl Store {
                 if let Some(text) = c.text {
                     tx.execute("INSERT INTO clip_texts (id, text) VALUES (?1, ?2)", params![id, text])?;
                 }
+                crate::tags::index_clip(&tx, id, c.text.unwrap_or(""), c.kind == ClipKind::Image, code)?;
                 (id, true)
             }
         };
@@ -365,10 +377,44 @@ impl Store {
     /// first those whose full text has `q.text` as a substring (any case),
     /// then — if there is room left — those that have it with a typo or two.
     pub fn search(&self, q: &Search, limit: u32) -> Result<Vec<Clip>> {
+        let mut found = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let mut queries = vec![q.clone()];
+        if let Some(text) = crate::search::other_layout(&q.text) {
+            queries.push(Search { text, ..q.clone() });
+        }
+        // Exact matches in either layout rank ahead of approximate matches.
+        for fuzzy in [false, true] {
+            for query in &queries {
+                if found.len() >= limit as usize { break; }
+                for mut clip in self.search_literal(query, limit, fuzzy)? {
+                    if !seen.insert(clip.id) { continue; }
+                    if !query.text.trim().is_empty() {
+                        if let Some(body) = self.full_text(clip.id)? {
+                            if let Some(excerpt) = crate::search::excerpt(&query.text, &body) {
+                                clip.preview = Some(excerpt.text);
+                                clip.preview_offset = excerpt.offset;
+                                clip.match_range = Some(excerpt.matched);
+                            }
+                        }
+                    }
+                    found.push(clip);
+                    if found.len() >= limit as usize { break; }
+                }
+            }
+        }
+        Ok(found)
+    }
+
+    fn search_literal(&self, q: &Search, limit: u32, fuzzy: bool) -> Result<Vec<Clip>> {
         let text = q.text.trim();
         // the filters, after the text condition's argument
         let mut filter = String::new();
         let mut args: Vec<Value> = Vec::new();
+        if let Some(tag) = &q.tag_id {
+            filter.push_str(" AND id IN (SELECT clip_id FROM clip_tags JOIN tag_rules ON tag_rules.id=tag_id WHERE tag_id=? AND enabled=1)");
+            args.push(Value::Text(tag.clone()));
+        }
         if let Some(app) = &q.app {
             filter.push_str(" AND source_app LIKE ? ESCAPE '\\'");
             args.push(Value::Text(like_pattern(app)));
@@ -388,18 +434,27 @@ impl Store {
             args.push(Value::Integer(t));
         }
 
-        // trigram needs at least 3 characters; shorter queries fall back to LIKE
-        let (cond, arg) = if text.is_empty() {
-            ("1", None)
+        // SQLite LIKE folds ASCII only. For one/two Unicode characters use
+        // the at most four case combinations; longer queries use Unicode FTS.
+        let (cond, text_args): (String, Vec<String>) = if text.is_empty() {
+            ("1".into(), Vec::new())
         } else if text.chars().count() >= 3 {
-            ("id IN (SELECT rowid FROM texts_fts WHERE texts_fts MATCH ?)", Some(format!("\"{}\"", text.replace('"', "\"\""))))
+            ("id IN (SELECT rowid FROM texts_fts WHERE texts_fts MATCH ?)".into(), vec![format!("\"{}\"", text.replace('"', "\"\""))])
         } else {
-            ("id IN (SELECT id FROM clip_texts WHERE text LIKE ? ESCAPE '\\')", Some(like_pattern(text)))
+            let mut variants = vec![String::new()];
+            for c in text.chars() {
+                let mut cases = vec![c.to_lowercase().collect::<String>(), c.to_uppercase().collect::<String>()];
+                cases.dedup();
+                variants = variants.iter().flat_map(|prefix| cases.iter().map(move |suffix| format!("{prefix}{suffix}"))).collect();
+            }
+            let conditions = vec!["text LIKE ? ESCAPE '\\'"; variants.len()].join(" OR ");
+            (format!("id IN (SELECT id FROM clip_texts WHERE {conditions})"), variants.iter().map(|s| like_pattern(s)).collect())
         };
         let sql = format!("SELECT {COLUMNS} FROM clips WHERE {cond}{filter} {ORDER} LIMIT ?");
-        let all = arg.map(Value::Text).into_iter().chain(args.iter().cloned()).chain([Value::Integer(limit.into())]);
+        let all = text_args.into_iter().map(Value::Text).chain(args.iter().cloned()).chain([Value::Integer(limit.into())]);
         let mut stmt = self.conn.prepare_cached(&sql)?;
         let mut found: Vec<Clip> = stmt.query_map(params_from_iter(all), from_row)?.collect::<rusqlite::Result<_>>()?;
+        if !fuzzy { return Ok(found); }
 
         // with typos: candidates from the trigram index (texts sharing any three
         // letters in a row with the query, best first), checked here on the
@@ -591,6 +646,8 @@ fn from_row(r: &Row) -> rusqlite::Result<Clip> {
         created_at: r.get(9)?,
         pinned: r.get(10)?,
         code: r.get(11)?,
+        preview_offset: 0,
+        match_range: None,
     })
 }
 
@@ -629,6 +686,63 @@ mod tests {
             created_at: None,
             pinned: false,
         }
+    }
+
+    #[test]
+    fn website_tag_upgrade_removes_false_positives_and_keeps_custom_rules() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        for (i, m) in MIGRATIONS[..8].iter().enumerate() {
+            let tx = conn.transaction().unwrap();
+            tx.execute_batch(m.sql).unwrap();
+            if let Some(code) = m.code { code(&tx).unwrap(); }
+            tx.pragma_update(None, "user_version", (i + 1) as u32).unwrap();
+            tx.commit().unwrap();
+        }
+        for (id, content) in [(1, "https://example.com"), (2, "Docs: https://example.com"), (3, "curl https://example.com/api")] {
+            conn.execute("INSERT INTO clips(id,uuid,kind,preview,hash,created_at,pinned,code) VALUES(?1,?2,0,?3,?2,?1,0,0)",params![id,format!("clip-{id}"),content]).unwrap();
+            conn.execute("INSERT INTO clip_texts VALUES(?1,?2)",params![id,content]).unwrap();
+            conn.execute("INSERT INTO clip_tags VALUES('website',?1)",[id]).unwrap();
+        }
+        conn.execute("UPDATE tag_rules SET name='ссылка',color='#112233' WHERE id='website'",[]).unwrap();
+        conn.execute("INSERT INTO tag_rules VALUES('docs','regex','документы','#C0438B','Docs:',1)",[]).unwrap();
+        conn.execute("INSERT INTO clip_tags VALUES('docs',2)",[]).unwrap();
+        let store = Store::init(conn).unwrap();
+        let rules = store.tag_rules().unwrap();
+        let website = rules.iter().find(|r| r.id == "website").unwrap();
+        assert_eq!((website.name.as_str(),website.color.as_str(),website.count),("ссылка","#112233",1));
+        assert_eq!(rules.iter().find(|r| r.id == "docs").unwrap().count,1);
+        assert_eq!(store.search(&Search { tag_id:Some("website".into()),..Default::default() },50).unwrap()[0].id,1);
+        assert_eq!(store.list(0,50).unwrap().len(),3);
+        assert_eq!(store.full_text(2).unwrap().as_deref(),Some("Docs: https://example.com"));
+    }
+
+    #[test]
+    fn smart_tags_migrate_existing_full_texts_and_images() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("clips.sqlite");
+        let mut conn = Connection::open(&path).unwrap();
+        conn.pragma_update(None, "journal_mode", "WAL").unwrap();
+        for (i, m) in MIGRATIONS[..7].iter().enumerate() {
+            let tx = conn.transaction().unwrap();
+            tx.execute_batch(m.sql).unwrap();
+            if let Some(code) = m.code { code(&tx).unwrap(); }
+            tx.pragma_update(None, "user_version", (i + 1) as u32).unwrap();
+            tx.commit().unwrap();
+        }
+        conn.execute("INSERT INTO clips (id,uuid,kind,preview,hash,created_at,pinned,code) VALUES (1,'old',0,'preview','a',1,0,0),(2,'image',1,NULL,'b',2,0,0)",[]).unwrap();
+        conn.execute("INSERT INTO clip_texts VALUES (1,?1)",[format!("{} old@example.com", "x ".repeat(2000))]).unwrap();
+        drop(conn);
+        let start = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let workers: Vec<_> = (0..2).map(|_| {
+            let path = path.clone(); let start = start.clone();
+            std::thread::spawn(move || { start.wait(); Store::open(&path).unwrap().tag_rules().unwrap().len() })
+        }).collect();
+        for worker in workers { assert_eq!(worker.join().unwrap(), 7); }
+        let store = Store::open(&path).unwrap();
+        let rules = store.tag_rules().unwrap();
+        assert_eq!(rules.iter().find(|r| r.id == "email").unwrap().count,1);
+        assert_eq!(rules.iter().find(|r| r.id == "image").unwrap().count,1);
+        assert_eq!(store.list(0,50).unwrap().len(),2);
     }
 
     #[test]
@@ -717,6 +831,36 @@ mod tests {
         // quotes and FTS operators are treated literally
         assert!(s.search(&"\"a\" OR b*".into(), 10).unwrap().is_empty());
         assert_eq!(s.search(&"".into(), 10).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn short_layout_queries_are_case_insensitive() {
+        let mut s = Store::open_in_memory().unwrap();
+        s.upsert(&text("Привет", "ru-upper")).unwrap();
+        let hits = s.search(&"gh".into(), 10).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].preview.as_ref().unwrap().get(hits[0].match_range.clone().unwrap()), Some("Пр"));
+        assert_eq!(s.search(&"пР".into(), 10).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn layout_search_snippets_and_filters_preserve_originals() {
+        let mut s = Store::open_in_memory().unwrap();
+        let body = format!("{}Привет, мир! {}", "начало ".repeat(700), "хвост ".repeat(100));
+        let (clip, _) = s.upsert(&NewClip { source_app: Some("Editor"), created_at: Some(1000), ..text(&body, "ru") }).unwrap();
+        s.upsert(&NewClip { source_app: Some("Browser"), created_at: Some(2000), ..text("привет другой", "other") }).unwrap();
+        let q = Search { text: "ghbdtn".into(), app: Some("Editor".into()), after: Some(500), before: Some(1500), ..Default::default() };
+        let found = s.search(&q, 10).unwrap();
+        assert_eq!(found.len(), 1);
+        let hit = &found[0];
+        let preview = hit.preview.as_ref().unwrap();
+        assert_eq!(&preview[hit.match_range.clone().unwrap()], "Привет");
+        assert!(hit.preview_offset > 2000);
+        assert_eq!(&body[hit.preview_offset..hit.preview_offset + preview.len()], preview);
+        assert_eq!(s.full_text(clip.id).unwrap().unwrap(), body);
+        s.upsert(&text("hello world", "en")).unwrap();
+        assert_eq!(s.search(&"руддщ".into(), 10).unwrap()[0].preview.as_deref(), Some("hello world"));
+        assert_eq!(s.search(&q, 0).unwrap().len(), 0);
     }
 
     #[test]
